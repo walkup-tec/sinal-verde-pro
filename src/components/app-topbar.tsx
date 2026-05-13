@@ -1,0 +1,110 @@
+import { useRouterState, Link } from "@tanstack/react-router";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Bell, Search, Sun, Moon, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+const TITLES: Record<string, string> = {
+  "/app": "Dashboard",
+  "/app/clientes": "Clientes",
+  "/app/clientes/novo": "Novo cliente",
+  "/app/propostas": "Propostas",
+  "/app/remarketing": "Remarketing",
+  "/app/agenda": "Agenda & Follow-up",
+  "/app/documentos": "Documentos",
+  "/app/relatorios": "Relatórios",
+  "/app/whatsapp": "WhatsApp",
+  "/app/configuracoes": "Configurações",
+};
+
+export function AppTopbar() {
+  const path = useRouterState({ select: (s) => s.location.pathname });
+  const [dark, setDark] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+  }, [dark]);
+
+  const segs = path.split("/").filter(Boolean);
+  const crumbs = segs.map((seg, i) => {
+    const url = "/" + segs.slice(0, i + 1).join("/");
+    return { label: TITLES[url] ?? seg, url };
+  });
+  const title = TITLES[path] ?? crumbs.at(-1)?.label ?? "Sinal Verde";
+
+  return (
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur">
+      <SidebarTrigger className="-ml-1" />
+      <div className="hidden md:flex flex-col">
+        <nav className="flex items-center gap-1 text-xs text-muted-foreground">
+          {crumbs.map((c, i) => (
+            <span key={c.url} className="flex items-center gap-1">
+              {i > 0 && <span className="opacity-50">/</span>}
+              <Link to={c.url} className="hover:text-foreground transition-colors">
+                {c.label}
+              </Link>
+            </span>
+          ))}
+        </nav>
+        <h1 className="font-display text-lg font-semibold tracking-tight">{title}</h1>
+      </div>
+
+      <div className="ml-auto flex items-center gap-2">
+        <div className="relative hidden md:block">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar cliente, CPF, proposta…"
+            className="h-9 w-72 pl-9 bg-muted/50 border-transparent focus-visible:bg-surface"
+          />
+          <kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 select-none rounded border bg-surface px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground md:inline-block">
+            ⌘K
+          </kbd>
+        </div>
+        <Button asChild size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90 shadow-soft hidden sm:inline-flex">
+          <Link to="/app/clientes/novo">
+            <Plus className="size-4" /> Novo cliente
+          </Link>
+        </Button>
+        <Button variant="ghost" size="icon" onClick={() => setDark((v) => !v)} aria-label="Alternar tema">
+          {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+        </Button>
+        <Button variant="ghost" size="icon" className="relative" aria-label="Notificações">
+          <Bell className="size-4" />
+          <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-accent" />
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-2 rounded-full pl-1 pr-3 py-1 hover:bg-muted transition-colors">
+              <span className="grid size-8 place-items-center rounded-full bg-primary text-primary-foreground text-xs font-semibold">
+                CM
+              </span>
+              <span className="hidden md:block text-left leading-tight">
+                <span className="block text-xs font-semibold">Carla Mendes</span>
+                <span className="block text-[10px] text-muted-foreground">Gerente</span>
+              </span>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuLabel>Minha conta</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem>Perfil</DropdownMenuItem>
+            <DropdownMenuItem>Preferências</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link to="/login">Sair</Link>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </header>
+  );
+}
