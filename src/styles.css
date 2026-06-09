@@ -66,8 +66,8 @@
 :root {
   --radius: 0.875rem;
 
-  /* Brand: #fcffde login panel, #2b5330 primary, #76b43c accent */
-  --login-brand-bg: #fcffde;
+  /* Brand: #153013 login panel, #2b5330 primary, #76b43c accent, #fcffde bg */
+  --login-brand-bg: #153013;
   --background: oklch(0.985 0.04 110);   /* #fcffde-ish */
   --foreground: oklch(0.22 0.04 150);
   --surface: oklch(1 0 0);
