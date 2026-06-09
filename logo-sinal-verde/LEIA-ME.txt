@@ -6,4 +6,6 @@ Arquivos:
 - logo-pagina-2.png — vertical empilhada
 - logo-canva-screen.png — preview 1024x1024
 
-O sistema usa logo-pagina-1.png em src/assets e public/.
+O sistema usa Logo-melhorada.png (300x110, transparente) em src/assets e public/.
+
+Arquivo principal do app: logo-sinal-verde/Logo-melhorada.png

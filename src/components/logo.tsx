@@ -28,8 +28,8 @@ export function Logo({
       <img
         src={src}
         alt="Sinal Verde — Sinal aberto para você o tempo inteiro"
-        width={352}
-        height={106}
+        width={300}
+        height={110}
         className={cn(
           "object-contain object-left",
           compact
