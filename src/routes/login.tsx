@@ -33,7 +33,7 @@ function LoginPage() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2 bg-background">
-      <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-login-brand text-primary-foreground p-10">
+      <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-login-brand text-foreground p-10">
         <div className="absolute inset-0 opacity-30">
           <div className="absolute -top-32 -left-32 size-[480px] rounded-full bg-accent/40 blur-3xl" />
           <div className="absolute bottom-0 right-0 size-[420px] rounded-full bg-accent/20 blur-3xl" />
@@ -45,7 +45,7 @@ function LoginPage() {
           <h2 className="font-display text-4xl font-bold leading-tight tracking-tight">
             O CRM que <span className="text-accent">acelera</span> sua operação comercial.
           </h2>
-          <p className="text-primary-foreground/80">
+          <p className="text-muted-foreground">
             Pipeline de propostas, remarketing inteligente, follow-up automático e
             atendimento centralizado em um só lugar.
           </p>
@@ -70,7 +70,7 @@ function LoginPage() {
             </li>
           </ul>
         </div>
-        <div className="relative z-10 text-xs text-primary-foreground/60">
+        <div className="relative z-10 text-xs text-muted-foreground">
           © {new Date().getFullYear()} Sinal Verde — Todos os direitos reservados.
         </div>
       </div>
