@@ -16,7 +16,6 @@ import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as AppWhatsappRouteImport } from './routes/app/whatsapp'
 import { Route as AppRemarketingRouteImport } from './routes/app/remarketing'
 import { Route as AppRelatoriosRouteImport } from './routes/app/relatorios'
-import { Route as AppPropostasRouteImport } from './routes/app/propostas'
 import { Route as AppDocumentosRouteImport } from './routes/app/documentos'
 import { Route as AppConfiguracoesRouteImport } from './routes/app/configuracoes'
 import { Route as AppClientesRouteImport } from './routes/app/clientes'
@@ -58,11 +57,6 @@ const AppRelatoriosRoute = AppRelatoriosRouteImport.update({
   path: '/relatorios',
   getParentRoute: () => AppRoute,
 } as any)
-const AppPropostasRoute = AppPropostasRouteImport.update({
-  id: '/propostas',
-  path: '/propostas',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppDocumentosRoute = AppDocumentosRouteImport.update({
   id: '/documentos',
   path: '/documentos',
@@ -97,7 +91,6 @@ export interface FileRoutesByFullPath {
   '/app/clientes': typeof AppClientesRouteWithChildren
   '/app/configuracoes': typeof AppConfiguracoesRoute
   '/app/documentos': typeof AppDocumentosRoute
-  '/app/propostas': typeof AppPropostasRoute
   '/app/relatorios': typeof AppRelatoriosRoute
   '/app/remarketing': typeof AppRemarketingRoute
   '/app/whatsapp': typeof AppWhatsappRoute
@@ -111,7 +104,6 @@ export interface FileRoutesByTo {
   '/app/clientes': typeof AppClientesRouteWithChildren
   '/app/configuracoes': typeof AppConfiguracoesRoute
   '/app/documentos': typeof AppDocumentosRoute
-  '/app/propostas': typeof AppPropostasRoute
   '/app/relatorios': typeof AppRelatoriosRoute
   '/app/remarketing': typeof AppRemarketingRoute
   '/app/whatsapp': typeof AppWhatsappRoute
@@ -127,7 +119,6 @@ export interface FileRoutesById {
   '/app/clientes': typeof AppClientesRouteWithChildren
   '/app/configuracoes': typeof AppConfiguracoesRoute
   '/app/documentos': typeof AppDocumentosRoute
-  '/app/propostas': typeof AppPropostasRoute
   '/app/relatorios': typeof AppRelatoriosRoute
   '/app/remarketing': typeof AppRemarketingRoute
   '/app/whatsapp': typeof AppWhatsappRoute
@@ -144,7 +135,6 @@ export interface FileRouteTypes {
     | '/app/clientes'
     | '/app/configuracoes'
     | '/app/documentos'
-    | '/app/propostas'
     | '/app/relatorios'
     | '/app/remarketing'
     | '/app/whatsapp'
@@ -158,7 +148,6 @@ export interface FileRouteTypes {
     | '/app/clientes'
     | '/app/configuracoes'
     | '/app/documentos'
-    | '/app/propostas'
     | '/app/relatorios'
     | '/app/remarketing'
     | '/app/whatsapp'
@@ -173,7 +162,6 @@ export interface FileRouteTypes {
     | '/app/clientes'
     | '/app/configuracoes'
     | '/app/documentos'
-    | '/app/propostas'
     | '/app/relatorios'
     | '/app/remarketing'
     | '/app/whatsapp'
@@ -238,13 +226,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRelatoriosRouteImport
       parentRoute: typeof AppRoute
     }
-    '/app/propostas': {
-      id: '/app/propostas'
-      path: '/propostas'
-      fullPath: '/app/propostas'
-      preLoaderRoute: typeof AppPropostasRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/app/documentos': {
       id: '/app/documentos'
       path: '/documentos'
@@ -300,7 +281,6 @@ interface AppRouteChildren {
   AppClientesRoute: typeof AppClientesRouteWithChildren
   AppConfiguracoesRoute: typeof AppConfiguracoesRoute
   AppDocumentosRoute: typeof AppDocumentosRoute
-  AppPropostasRoute: typeof AppPropostasRoute
   AppRelatoriosRoute: typeof AppRelatoriosRoute
   AppRemarketingRoute: typeof AppRemarketingRoute
   AppWhatsappRoute: typeof AppWhatsappRoute
@@ -312,7 +292,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppClientesRoute: AppClientesRouteWithChildren,
   AppConfiguracoesRoute: AppConfiguracoesRoute,
   AppDocumentosRoute: AppDocumentosRoute,
-  AppPropostasRoute: AppPropostasRoute,
   AppRelatoriosRoute: AppRelatoriosRoute,
   AppRemarketingRoute: AppRemarketingRoute,
   AppWhatsappRoute: AppWhatsappRoute,

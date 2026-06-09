@@ -20,7 +20,6 @@ const TITLES: Record<string, string> = {
   "/app": "Dashboard",
   "/app/clientes": "Clientes",
   "/app/clientes/novo": "Novo cliente",
-  "/app/propostas": "Propostas",
   "/app/remarketing": "Remarketing",
   "/app/agenda": "Agenda & Follow-up",
   "/app/documentos": "Documentos",

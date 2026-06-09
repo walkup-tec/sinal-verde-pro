@@ -15,7 +15,6 @@ import {
 import {
   LayoutDashboard,
   Users,
-  FileSignature,
   Megaphone,
   CalendarDays,
   Folder,
@@ -31,7 +30,6 @@ type NavItem = { title: string; url: string; icon: React.ComponentType<{ classNa
 const OPERACAO: NavItem[] = [
   { title: "Dashboard", url: "/app", icon: LayoutDashboard },
   { title: "Clientes", url: "/app/clientes", icon: Users },
-  { title: "Propostas", url: "/app/propostas", icon: FileSignature },
 ];
 const COMERCIAL: NavItem[] = [
   { title: "Remarketing", url: "/app/remarketing", icon: Megaphone },
