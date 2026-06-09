@@ -1,0 +1,9 @@
+Logos exportadas do Canva (Opções de Logo):
+https://canva.link/2v0wbsjae8miw0i
+
+Arquivos:
+- logo-pagina-1.png — horizontal (login, sidebar)
+- logo-pagina-2.png — vertical empilhada
+- logo-canva-screen.png — preview 1024x1024
+
+O sistema usa logo-pagina-1.png em src/assets e public/.
