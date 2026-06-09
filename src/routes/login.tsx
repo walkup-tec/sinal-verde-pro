@@ -34,7 +34,7 @@ function LoginPage() {
         </div>
         <div className="relative z-10 max-w-md space-y-6">
           <h2 className="font-display text-4xl font-bold leading-tight tracking-tight">
-            O CRM financeiro que <span className="text-accent">acelera</span> sua operação comercial.
+            O CRM que <span className="text-accent">acelera</span> sua operação comercial.
           </h2>
           <p className="text-primary-foreground/80">
             Pipeline de propostas, remarketing inteligente, follow-up automático e
