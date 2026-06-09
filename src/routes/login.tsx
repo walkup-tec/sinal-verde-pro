@@ -33,7 +33,7 @@ function LoginPage() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2 bg-background">
-      <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-primary text-primary-foreground p-10">
+      <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-login-brand text-primary-foreground p-10">
         <div className="absolute inset-0 opacity-30">
           <div className="absolute -top-32 -left-32 size-[480px] rounded-full bg-accent/40 blur-3xl" />
           <div className="absolute bottom-0 right-0 size-[420px] rounded-full bg-accent/20 blur-3xl" />

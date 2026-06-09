@@ -57,6 +57,7 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-login-brand: var(--login-brand-bg);
 
   --shadow-soft: 0 1px 2px oklch(0.2 0.05 145 / 0.04), 0 4px 12px oklch(0.2 0.05 145 / 0.06);
   --shadow-elevated: 0 8px 32px oklch(0.2 0.05 145 / 0.10), 0 2px 6px oklch(0.2 0.05 145 / 0.05);
@@ -65,7 +66,8 @@
 :root {
   --radius: 0.875rem;
 
-  /* Brand: #2b5330 primary, #76b43c accent, #fcffde bg */
+  /* Brand: #153013 login panel, #2b5330 primary, #76b43c accent, #fcffde bg */
+  --login-brand-bg: #153013;
   --background: oklch(0.985 0.04 110);   /* #fcffde-ish */
   --foreground: oklch(0.22 0.04 150);
   --surface: oklch(1 0 0);
