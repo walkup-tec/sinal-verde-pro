@@ -16,9 +16,19 @@ dist-ssr
 .nitro
 *.local
 
-# Wrangler / Cloudflare
+# Wrangler / Cloudflare / secrets
 .wrangler/
 .dev.vars
+.env
+.env.local
+
+# Dados locais / artefatos
+data/
+*.xlsx
+tmp-*.ts
+tmp-*.html
+tmp-*.cjs
+Reuniões/
 
 # Editor directories and files
 .vscode/*
