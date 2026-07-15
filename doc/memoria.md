@@ -1,3 +1,9 @@
+## 2026-07-15 — Commit CRM completo (fonte SOMA)
+
+- Commit `bfe84f3` em `main` (push). Superfície clientes/agenda/kanban/modais versionada.
+- LOG: `doc/LOG-2026-07-15__140500__commit-crm-completo.md`
+
+---
 ## 2026-06-09 — Setup local Sinal Verde CRM
 
 - **Repo:** https://github.com/walkup-tec/sinal-verde-pro (`main`)
