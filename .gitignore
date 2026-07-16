@@ -40,3 +40,6 @@ Reuniões/
 *.njsproj
 *.sln
 *.sw?
+
+.env.easypanel
+

@@ -1,3 +1,11 @@
+## 2026-07-16 — Publicação Easypanel (VPS) em andamento
+
+- Projeto/serviço Easypanel: `sinal-verde` / `acesso-sinalverde`
+- DNS: `acesso-sinalverde.com` → `2.57.91.91`
+- Fonte: usar **Github** `walkup-tec/sinal-verde-pro` (não Upload zip)
+- Pendência: app é TanStack Start + Cloudflare — falta Dockerfile para VPS
+- Keywords: `easypanel`, `deploy`, `acesso-sinalverde.com`, `dockerfile`
+
 ## 2026-07-15 — Commit CRM completo (fonte SOMA)
 
 - Commit `bfe84f3` em `main` (push). Superfície clientes/agenda/kanban/modais versionada.
