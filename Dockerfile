@@ -1,34 +1,32 @@
-# Sinal Verde CRM — build Cloudflare (TanStack Start) servido localmente via Wrangler/Miniflare
-# Porta interna: 3000 (Easypanel)
+# Sinal Verde CRM — Node + Nitro (TanStack Start) para Easypanel
+# Doc: https://tanstack.com/start/latest/docs/framework/react/guide/hosting
+# Porta interna: 3000
 
-FROM oven/bun:1.3-alpine AS deps
+FROM oven/bun:1.3 AS deps
 WORKDIR /app
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 
-FROM oven/bun:1.3-alpine AS build
+FROM oven/bun:1.3 AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN bun run build
+ENV DEPLOY_TARGET=node
+ENV NODE_ENV=production
+RUN bun run build:node
 
-FROM oven/bun:1.3-alpine AS runner
+FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/bun.lock ./bun.lock
-COPY --from=build /app/wrangler.jsonc ./wrangler.jsonc
+COPY --from=build /app/.output ./.output
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
-
 RUN chmod +x ./docker-entrypoint.sh \
-  && addgroup -S app && adduser -S app -G app \
-  && mkdir -p /tmp/wrangler-state \
-  && chown -R app:app /app /tmp/wrangler-state
+  && groupadd -r app \
+  && useradd -r -g app app \
+  && chown -R app:app /app
 
 USER app
 EXPOSE 3000

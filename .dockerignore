@@ -23,4 +23,3 @@ doc
 .idea
 README.md
 **/*.md
-!wrangler.jsonc

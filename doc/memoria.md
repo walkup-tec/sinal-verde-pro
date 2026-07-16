@@ -1,10 +1,16 @@
+## 2026-07-16 — Dockerfile Easypanel publicado
+
+- Commit `cc60efc` em `main` (push): Dockerfile + docker-entrypoint.sh + .dockerignore
+- Easypanel: porta 3000, construção Dockerfile, env já salvas — falta Deploy/Redeploy
+- LOG: `doc/LOG-2026-07-16__145100__dockerfile-easypanel-deploy.md`
+- Keywords: `easypanel`, `dockerfile`, `cc60efc`, `acesso-sinalverde.com`
+
 ## 2026-07-16 — Publicação Easypanel (VPS) em andamento
 
 - Projeto/serviço Easypanel: `sinal-verde` / `acesso-sinalverde`
 - DNS: `acesso-sinalverde.com` → `2.57.91.91`
-- Fonte: usar **Github** `walkup-tec/sinal-verde-pro` (não Upload zip)
-- Pendência: app é TanStack Start + Cloudflare — falta Dockerfile para VPS
-- Keywords: `easypanel`, `deploy`, `acesso-sinalverde.com`, `dockerfile`
+- Fonte: Github `walkup-tec/sinal-verde-pro`
+- Keywords: `easypanel`, `deploy`, `acesso-sinalverde.com`
 
 ## 2026-07-15 — Commit CRM completo (fonte SOMA)
 
