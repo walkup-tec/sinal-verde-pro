@@ -15,5 +15,6 @@ export default defineConfig({
   tanstackStart: {
     server: { entry: "server" },
   },
-  plugins: isNodeDeploy ? [nitro()] : [],
+  // Preset explícito: build com Bun não pode emitir Bun.serve (runtime Easypanel = Node).
+  plugins: isNodeDeploy ? [nitro({ preset: "node-server" })] : [],
 });

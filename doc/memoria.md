@@ -1,3 +1,11 @@
+﻿## 2026-07-16 — Fix Bun is not defined (Nitro NodeServer)
+
+- Causa: build com `bun run` emitiu `Bun.serve`; runtime Node no Easypanel
+- Fix: `node vite build` + `preset: node-server`
+- LOG: `doc/LOG-2026-07-16__153000__fix-nitro-bun-is-not-defined.md`
+- Keywords: `Bun is not defined`, `srvx`, `node-server`, `easypanel`
+
+---
 ## 2026-07-16 — Dockerfile Easypanel publicado
 
 - Commit `cc60efc` em `main` (push): Dockerfile + docker-entrypoint.sh + .dockerignore
@@ -334,4 +342,5 @@
 ## 2026-07-14 — Dashboard pie tooltip
 - Hover: quantidade + %; fontes menores (legend 10px)
 - Keywords: pie tooltip, percentual status
+
 

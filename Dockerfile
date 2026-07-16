@@ -1,6 +1,9 @@
 # Sinal Verde CRM — Node + Nitro (TanStack Start) para Easypanel
 # Doc: https://tanstack.com/start/latest/docs/framework/react/guide/hosting
 # Porta interna: 3000
+#
+# Importante: o `vite build` DEVE rodar sob Node (não `bun run`), senão o Nitro/srvx
+# embute Bun.serve e o container Node cai com "Bun is not defined".
 
 FROM oven/bun:1.3 AS deps
 WORKDIR /app
@@ -12,8 +15,10 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV DEPLOY_TARGET=node
+ENV NITRO_PRESET=node-server
 ENV NODE_ENV=production
-RUN bun run build:node
+# Usa o Node embutido na imagem Bun — evita preset Bun no output
+RUN node ./node_modules/vite/bin/vite.js build
 
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
