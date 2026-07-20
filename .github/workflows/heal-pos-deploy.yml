@@ -24,27 +24,27 @@ concurrency:
 jobs:
   heal:
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 25
     steps:
       - name: Validar secrets
         run: |
           if [ -z "${{ secrets.VPS_SSH_PRIVATE_KEY }}" ]; then
             echo "::error::VPS_SSH_PRIVATE_KEY ausente no repo sinal-verde-pro."
-            echo "Copie o secret do WABA (Settings → Secrets → Actions) para este repositório."
             exit 1
           fi
 
-      - name: Aguardar Easypanel build/redeploy (Docker)
-        run: sleep 90
+      # Easypanel build Docker costuma demorar 2–6 min; heal cedo demais = 502 de novo
+      - name: Aguardar build/redeploy Easypanel
+        run: sleep 180
 
-      - name: SSH — install watch+timer e post-deploy
+      - name: SSH — install + post-deploy em loop (cobre janela Swarm)
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST != '' && secrets.VPS_HOST || '72.60.51.127' }}
           username: root
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: 22
-          command_timeout: 15m
+          command_timeout: 20m
           script: |
             set -euo pipefail
             REPO="https://raw.githubusercontent.com/walkup-tec/waba/master/scripts"
@@ -52,17 +52,28 @@ jobs:
               -o /tmp/heal-sinal-verde-pos-redeploy-vps.sh
             sed -i 's/\r$//' /tmp/heal-sinal-verde-pos-redeploy-vps.sh
             chmod +x /tmp/heal-sinal-verde-pos-redeploy-vps.sh
-            /tmp/heal-sinal-verde-pos-redeploy-vps.sh install
-            /tmp/heal-sinal-verde-pos-redeploy-vps.sh post-deploy || true
-            sleep 25
-            /tmp/heal-sinal-verde-pos-redeploy-vps.sh post-deploy
-            echo "--- status ---"
-            /tmp/heal-sinal-verde-pos-redeploy-vps.sh status
-            code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
-              --resolve acesso-sinalverde.com:443:127.0.0.1 \
-              https://acesso-sinalverde.com/ || echo 000)"
-            echo "https_sv=${code}"
-            case "$code" in
-              200|301|302|303|307|308) exit 0 ;;
-              *) exit 1 ;;
-            esac
+            /tmp/heal-sinal-verde-pos-redeploy-vps.sh install || true
+
+            ok=0
+            for i in 1 2 3 4 5 6; do
+              echo "=== passagem post-deploy ${i}/6 ==="
+              /tmp/heal-sinal-verde-pos-redeploy-vps.sh post-deploy || true
+              # restore explícito (Host → loadBalancer :30310)
+              curl -fsSL "${REPO}/restore-easypanel-traefik-backends-vps.sh" \
+                -o /tmp/restore-backends.sh
+              sed -i 's/\r$//' /tmp/restore-backends.sh
+              chmod +x /tmp/restore-backends.sh
+              bash /tmp/restore-backends.sh || true
+              sleep 15
+              code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
+                --resolve acesso-sinalverde.com:443:127.0.0.1 \
+                https://acesso-sinalverde.com/ || echo 000)"
+              echo "https_sv=${code}"
+              case "$code" in
+                200|301|302|303|307|308) ok=1; break ;;
+              esac
+              sleep 45
+            done
+
+            /tmp/heal-sinal-verde-pos-redeploy-vps.sh status || true
+            test "$ok" = "1"
