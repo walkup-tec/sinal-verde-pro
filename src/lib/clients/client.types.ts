@@ -117,6 +117,8 @@ export type ClientListItem = ClientActivityFlags & {
   nome: string | null;
   cpf: string | null;
   telefone: string | null;
+  /** Campo financeiro `valor_liberado` do cadastro (texto bruto). */
+  valorLiberado: string | null;
   distributionType: LeadDistribution["type"];
   distributionLabel: string;
   displayMode: ClientDisplayMode;

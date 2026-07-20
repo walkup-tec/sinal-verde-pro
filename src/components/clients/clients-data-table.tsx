@@ -12,6 +12,7 @@ import { StatusBadge } from "@/components/clients/status-badge";
 import type { ClientActionKind } from "@/components/clients/client-action-modals";
 import type { ClientListItem } from "@/lib/clients/client.types";
 import { formatLocalDateLabel } from "@/lib/dates/local-date";
+import { formatCurrencyBrlDisplay } from "@/lib/masks/br-currency";
 
 type Props = {
   items: Array<ClientListItem & { contactDate?: string }>;
@@ -77,6 +78,7 @@ export function ClientsDataTable({
             <TableHead>Cliente</TableHead>
             {showContactDate ? <TableHead>Agenda</TableHead> : null}
             <TableHead>Produto</TableHead>
+            <TableHead>Valor liberado</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="w-[140px] text-right">Ação</TableHead>
           </TableRow>
@@ -103,6 +105,9 @@ export function ClientsDataTable({
                   </TableCell>
                 ) : null}
                 <TableCell>{productsLabel(client, productName)}</TableCell>
+                <TableCell className="tabular-nums whitespace-nowrap">
+                  {formatCurrencyBrlDisplay(client.valorLiberado)}
+                </TableCell>
                 <TableCell>
                   <StatusBadge
                     label={statusLabel(client.status)}

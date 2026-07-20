@@ -181,6 +181,7 @@ function mapClientListItem(record: ClientRecord): ClientListItem {
     nome: record.data.nome ?? null,
     cpf: record.data.cpf ?? null,
     telefone: record.data.telefone ?? null,
+    valorLiberado: record.data.valor_liberado ?? null,
     distributionType: record.distribution.type,
     distributionLabel: distributionLabel(record.distribution),
     displayMode: record.display.mode,
@@ -211,6 +212,7 @@ type ClientListRow = {
   nome: string | null;
   cpf: string | null;
   telefone: string | null;
+  valor_liberado: string | null;
   distribution: LeadDistribution;
   display: ClientRecord["display"];
   created_at: Date;
@@ -229,6 +231,7 @@ function mapClientListRow(row: ClientListRow): ClientListItem {
     nome: row.nome,
     cpf: row.cpf,
     telefone: row.telefone,
+    valorLiberado: row.valor_liberado,
     distributionType: row.distribution.type,
     distributionLabel: distributionLabel(row.distribution),
     displayMode: row.display.mode,
@@ -373,6 +376,7 @@ async function listClientsPageFromPostgres(
       c.data->>'nome' as nome,
       c.data->>'cpf' as cpf,
       c.data->>'telefone' as telefone,
+      c.data->>'valor_liberado' as valor_liberado,
       c.distribution,
       c.display,
       c.created_at,
@@ -897,6 +901,7 @@ async function listScheduledClientsFromPostgres(
       c.data->>'nome' as nome,
       c.data->>'cpf' as cpf,
       c.data->>'telefone' as telefone,
+      c.data->>'valor_liberado' as valor_liberado,
       c.distribution,
       c.display,
       c.created_at,
@@ -1029,6 +1034,7 @@ async function listRemarketingClientsFromPostgres(
       c.data->>'nome' as nome,
       c.data->>'cpf' as cpf,
       c.data->>'telefone' as telefone,
+      c.data->>'valor_liberado' as valor_liberado,
       c.distribution,
       c.display,
       c.created_at,
@@ -1146,6 +1152,7 @@ async function listKanbanClientsFromPostgres(
       c.data->>'nome' as nome,
       c.data->>'cpf' as cpf,
       c.data->>'telefone' as telefone,
+      c.data->>'valor_liberado' as valor_liberado,
       c.distribution,
       c.display,
       c.created_at,
@@ -1343,6 +1350,7 @@ async function getDashboardSummaryFromPostgres(
       c.data->>'nome' as nome,
       c.data->>'cpf' as cpf,
       c.data->>'telefone' as telefone,
+      c.data->>'valor_liberado' as valor_liberado,
       c.distribution,
       c.display,
       c.created_at,

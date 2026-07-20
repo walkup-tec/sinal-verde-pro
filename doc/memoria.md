@@ -1,4 +1,10 @@
-﻿## 2026-07-20 — Exportar Excel em ação em massa (telefone EVO)
+﻿## 2026-07-20 — Valor liberado na lista + Export Remarketing
+- Lista clientes: coluna Valor liberado (antes de Status) — `---` ou `R$`
+- Remarketing: botão Exportar (mesmo Excel do modal Clientes)
+- Modal Exportar: removida frase Evolution API
+- LOG: `doc/LOG-2026-07-20__151500__valor-liberado-export-remarketing.md`
+
+## 2026-07-20 — Exportar Excel em ação em massa (telefone EVO)
 - Modal Ações: aba **Exportar** antes de Exclusão → baixa `.xlsx` com todos os campos
 - Telefone/WhatsApp no padrão Evolution (`55` + dígitos)
 - `bulkExportClientsFn` + `client-bulk-export.ts`

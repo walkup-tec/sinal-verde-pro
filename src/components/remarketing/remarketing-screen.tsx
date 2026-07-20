@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Megaphone } from "lucide-react";
+import { toast } from "sonner";
+import { Download, Loader2, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClientListActionLayer } from "@/components/clients/client-list-action-layer";
 import { ClientsDataTable } from "@/components/clients/clients-data-table";
 import type { ClientActionKind } from "@/components/clients/client-action-modals";
 import { useSystemSettings } from "@/hooks/use-system-settings";
-import { listRemarketingFn } from "@/lib/clients/remarketing.server";
+import { exportRemarketingFn, listRemarketingFn } from "@/lib/clients/remarketing.server";
 import {
   resolveAttendanceStatusColor,
   resolveAttendanceStatusLabel,
@@ -19,6 +20,7 @@ import type {
   RemarketingListItem,
 } from "@/lib/clients/client.types";
 import { formatLocalDateLabel, resolveRemarketingDateRange } from "@/lib/dates/local-date";
+import { downloadBase64File } from "@/lib/utils/download-base64";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -50,9 +52,11 @@ export function RemarketingScreen({ initialFilter, initialItems }: Props) {
   const navigate = useNavigate();
   const { settings } = useSystemSettings();
   const listRemarketing = useServerFn(listRemarketingFn);
+  const exportRemarketing = useServerFn(exportRemarketingFn);
   const [filter, setFilter] = useState<RemarketingFilter>(initialFilter);
   const [items, setItems] = useState(initialItems);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [actionClient, setActionClient] = useState<RemarketingListItem | null>(null);
   const [actionKind, setActionKind] = useState<ClientActionKind | null>(null);
 
@@ -80,6 +84,25 @@ export function RemarketingScreen({ initialFilter, initialItems }: Props) {
     },
     [listRemarketing, navigate],
   );
+
+  const handleExport = async () => {
+    if (items.length === 0) {
+      toast.error("Nenhum cliente no filtro atual para exportar.");
+      return;
+    }
+    setExporting(true);
+    try {
+      const result = await exportRemarketing({
+        data: { clientIds: items.map((item) => item.id) },
+      });
+      downloadBase64File(result.fileName, result.mimeType, result.base64);
+      toast.success(`Excel gerado com ${result.affected} lead(s).`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao exportar.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const productName = (productId: string) =>
     settings.products.find((product) => product.id === productId)?.name ?? productId;
@@ -145,13 +168,27 @@ export function RemarketingScreen({ initialFilter, initialItems }: Props) {
                       size="sm"
                       variant={active ? "default" : "outline"}
                       className={cn(active && "shadow-sm")}
-                      disabled={loading}
+                      disabled={loading || exporting}
                       onClick={() => void loadList(option.id)}
                     >
                       {option.label}
                     </Button>
                   );
                 })}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={loading || exporting || items.length === 0}
+                  onClick={() => void handleExport()}
+                >
+                  {exporting ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Download className="size-4" />
+                  )}
+                  Exportar
+                </Button>
               </div>
             </div>
           </CardHeader>

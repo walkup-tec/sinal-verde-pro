@@ -13,3 +13,13 @@ export function maskCurrencyBrl(value: string): string {
     currency: "BRL",
   });
 }
+
+/** Exibição em lista: vazio → `---`; senão máscara R$. */
+export function formatCurrencyBrlDisplay(value: string | null | undefined): string {
+  const raw = (value ?? "").trim();
+  if (!raw) return "---";
+  if (/R\$/.test(raw)) return raw;
+  const digits = currencyDigits(raw);
+  if (!digits) return "---";
+  return maskCurrencyBrl(digits);
+}

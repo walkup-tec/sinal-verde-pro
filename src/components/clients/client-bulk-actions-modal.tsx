@@ -32,6 +32,7 @@ import {
 import type { ClientBulkScope } from "@/lib/clients/client.types";
 import { useSystemSettings } from "@/hooks/use-system-settings";
 import { localDateString } from "@/lib/dates/local-date";
+import { downloadBase64File } from "@/lib/utils/download-base64";
 
 type BulkAction = "schedule" | "product" | "status" | "export" | "delete";
 
@@ -42,19 +43,6 @@ type Props = {
   selectionLabel: string;
   onCompleted: () => void;
 };
-
-function downloadBase64File(fileName: string, mimeType: string, base64: string) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  const blob = new Blob([bytes], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = fileName;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
 
 export function ClientBulkActionsModal({
   open,
@@ -285,12 +273,6 @@ export function ClientBulkActionsModal({
               <p>
                 Gera e baixa um Excel (.xlsx) com todos os campos dos leads da seleção, no formato de
                 planilha/banco de dados (uma linha por lead).
-              </p>
-              <p>
-                As colunas <strong className="text-foreground">Telefone</strong> e{" "}
-                <strong className="text-foreground">WhatsApp</strong> saem só com dígitos no padrão
-                Evolution API (DDI 55), ex.:{" "}
-                <code className="text-foreground">5551999666841</code>.
               </p>
             </div>
           ) : null}
