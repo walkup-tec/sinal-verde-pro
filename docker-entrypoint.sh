@@ -32,13 +32,13 @@ if [ ! -f "${APP_DIR}/.output/server/index.mjs" ]; then
 fi
 
 cd "${APP_DIR}"
-# Força bind em todas as interfaces — Easypanel às vezes injeta HOST=localhost (quebra Traefik → 502)
 export PORT="${PORT}"
 export NITRO_PORT="${PORT}"
 export HOST=0.0.0.0
 export NITRO_HOST=0.0.0.0
-# Evita shutdown prematuro por SIGTERM de probe/redeploy durante o boot
+# Desliga graceful shutdown do srvx (evita "Server closed successfully" no SIGTERM de probe)
+export CI=true
 export NITRO_SHUTDOWN_DISABLED=true
 
-echo "Starting Nitro on 0.0.0.0:${PORT} (NITRO_HOST=${NITRO_HOST})"
-exec node .output/server/index.mjs
+echo "Starting Nitro keepalive on 0.0.0.0:${PORT}"
+exec node ./server-keepalive.mjs

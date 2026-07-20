@@ -27,9 +27,12 @@ ENV PORT=3000
 ENV HOST=0.0.0.0
 ENV NITRO_HOST=0.0.0.0
 ENV NITRO_PORT=3000
+ENV CI=true
+ENV NITRO_SHUTDOWN_DISABLED=true
 
 COPY --from=build /app/.output ./.output
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
+COPY server-keepalive.mjs ./server-keepalive.mjs
 RUN chmod +x ./docker-entrypoint.sh \
   && groupadd -r app \
   && useradd -r -g app app \
@@ -37,6 +40,5 @@ RUN chmod +x ./docker-entrypoint.sh \
 
 USER app
 EXPOSE 3000
-HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=5 \
-  CMD node -e "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok||r.status===302||r.status===404?0:1)).catch(()=>process.exit(1))"
+# Sem HEALTHCHECK Docker — Easypanel/Swarm probe na porta errada gerava SIGTERM + "Server closed".
 ENTRYPOINT ["./docker-entrypoint.sh"]
