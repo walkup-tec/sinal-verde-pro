@@ -22,6 +22,8 @@ APP_DIR="/app"
   echo "SMTP_PASS=${SMTP_PASS:-}"
   echo "NODE_ENV=${NODE_ENV:-production}"
   echo "PORT=${PORT}"
+  echo "HOST=0.0.0.0"
+  echo "NITRO_HOST=0.0.0.0"
 } > "${APP_DIR}/.env.local"
 
 if [ ! -f "${APP_DIR}/.output/server/index.mjs" ]; then
@@ -30,8 +32,13 @@ if [ ! -f "${APP_DIR}/.output/server/index.mjs" ]; then
 fi
 
 cd "${APP_DIR}"
-export PORT
-export HOST="${HOST:-0.0.0.0}"
-export NITRO_HOST="${NITRO_HOST:-${HOST}}"
-export NITRO_PORT="${NITRO_PORT:-${PORT}}"
+# Força bind em todas as interfaces — Easypanel às vezes injeta HOST=localhost (quebra Traefik → 502)
+export PORT="${PORT}"
+export NITRO_PORT="${PORT}"
+export HOST=0.0.0.0
+export NITRO_HOST=0.0.0.0
+# Evita shutdown prematuro por SIGTERM de probe/redeploy durante o boot
+export NITRO_SHUTDOWN_DISABLED=true
+
+echo "Starting Nitro on 0.0.0.0:${PORT} (NITRO_HOST=${NITRO_HOST})"
 exec node .output/server/index.mjs
