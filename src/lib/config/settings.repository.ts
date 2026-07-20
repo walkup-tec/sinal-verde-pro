@@ -99,15 +99,12 @@ async function loadSystemSettingsFromPostgres(): Promise<SystemSettings> {
       };
     }),
     banks: banks.map((bank) => ({ id: bank.id, name: bank.name })),
-    attendanceStatuses:
-      attendanceStatuses.length > 0
-        ? attendanceStatuses.map((status) => ({
-            id: status.id,
-            label: status.label,
-            color: status.color ?? "#64748b",
-            autoReturnDays: status.auto_return_days,
-          }))
-        : undefined,
+    attendanceStatuses: attendanceStatuses.map((status) => ({
+      id: status.id,
+      label: status.label,
+      color: status.color ?? "#64748b",
+      autoReturnDays: status.auto_return_days,
+    })),
   } as SystemSettings);
 }
 

@@ -191,7 +191,7 @@ export function normalizeAttendanceStatuses(
       return true;
     });
 
-  return normalized.length > 0 ? normalized : [...DEFAULT_ATTENDANCE_STATUSES];
+  return normalized;
 }
 
 export function normalizeBanks(banks: BankConfig[]): BankConfig[] {

@@ -50,12 +50,12 @@ export function AttendanceStatusesSettings({ settings, onChange }: Props) {
         color: normalizeStatusColor(status.color, DEFAULT_STATUS_COLOR),
         autoReturnDays: normalizeAutoReturnDays(status.autoReturnDays),
       }));
-    if (filled.length === 0) {
-      toast.error("Informe ao menos um status com nome preenchido.");
-      return;
-    }
     void onChange({ ...settings, attendanceStatuses: filled });
-    toast.success("Status de atendimento salvos.");
+    toast.success(
+      filled.length === 0
+        ? "Nenhum status cadastrado. Lista salva vazia."
+        : "Status de atendimento salvos.",
+    );
   };
 
   return (
@@ -148,7 +148,6 @@ export function AttendanceStatusesSettings({ settings, onChange }: Props) {
                     className="shrink-0 text-destructive hover:text-destructive"
                     onClick={() => removeStatus(status.id)}
                     aria-label="Remover status"
-                    disabled={statuses.length <= 1}
                   >
                     <Trash2 className="size-4" />
                   </Button>
