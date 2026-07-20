@@ -1,4 +1,11 @@
-﻿## 2026-07-20 — Server closed = healthcheck porta errada
+﻿## 2026-07-20 — Exportar Excel em ação em massa (telefone EVO)
+- Modal Ações: aba **Exportar** antes de Exclusão → baixa `.xlsx` com todos os campos
+- Telefone/WhatsApp no padrão Evolution (`55` + dígitos)
+- `bulkExportClientsFn` + `client-bulk-export.ts`
+- LOG: `doc/LOG-2026-07-20__145000__bulk-export-excel-evo-phone.md`
+- Keywords: `exportar`, `excel`, `bulk`, `evo`, `telefone`
+
+## 2026-07-20 — Server closed = healthcheck porta errada
 
 - Listening 3000 + Server closed = SIGTERM (healthcheck em 80?)
 - Ajuste Easypanel: healthcheck porta **3000**

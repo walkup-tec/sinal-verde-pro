@@ -28,7 +28,9 @@ import {
   bulkScheduleClientsForUser,
   bulkUpdateClientStatus,
   countClientsInBulkScope,
+  listClientsForBulkExport,
 } from "@/lib/clients/client-bulk.repository";
+import { buildBulkClientsExportWorkbook } from "@/lib/clients/client-bulk-export";
 import {
   attendanceStatuses,
   isValidAttendanceStatus,
@@ -42,7 +44,7 @@ import {
   updateClientStatus,
 } from "@/lib/clients/clients.repository";
 import { loadSystemSettingsFromDisk } from "@/lib/config/settings.repository";
-import { findUserById } from "@/lib/users/user.repository";
+import { findUserById, listAllUsers } from "@/lib/users/user.repository";
 import type {
   ClientBulkFilters,
   ClientBulkScope,
@@ -64,7 +66,6 @@ import {
   initImportUpload,
 } from "@/lib/clients/import-upload.repository";
 import { parseExcelPreviewFromPath } from "@/lib/clients/parse-excel-server";
-import { listAllUsers } from "@/lib/users/user.repository";
 
 function requireClientesAccess() {
   return getSession(sessionConfig).then((session) => {
@@ -224,6 +225,33 @@ export const bulkDeleteClientsFn = createServerFn({ method: "POST" })
       actorUserId: user.userId,
       isMaster: user.role === "master",
     });
+  });
+
+export const bulkExportClientsFn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => parseBulkScope(data))
+  .handler(async ({ data }) => {
+    const user = await requireClientesAccess();
+    const rows = await listClientsForBulkExport({
+      scope: data,
+      actorUserId: user.userId,
+      isMaster: user.role === "master",
+    });
+    const workbook = buildBulkClientsExportWorkbook(
+      rows.map((row) => ({
+        id: row.id,
+        productId: row.productId,
+        status: row.status,
+        createdAt: row.createdAt,
+        produtos: row.produtos,
+        data: row.data as Partial<Record<ClientFieldId, string>>,
+      })),
+    );
+    return {
+      affected: rows.length,
+      fileName: workbook.fileName,
+      mimeType: workbook.mimeType,
+      base64: workbook.buffer.toString("base64"),
+    };
   });
 
 export const bulkUpdateStatusFn = createServerFn({ method: "POST" })

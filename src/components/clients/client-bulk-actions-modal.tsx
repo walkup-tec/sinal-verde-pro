@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { CalendarDays, ListChecks, PackagePlus, Trash2 } from "lucide-react";
+import { CalendarDays, Download, ListChecks, PackagePlus, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,7 @@ import {
 import {
   bulkAddProductFn,
   bulkDeleteClientsFn,
+  bulkExportClientsFn,
   bulkScheduleClientsFn,
   bulkUpdateStatusFn,
   countBulkClientsFn,
@@ -32,7 +33,7 @@ import type { ClientBulkScope } from "@/lib/clients/client.types";
 import { useSystemSettings } from "@/hooks/use-system-settings";
 import { localDateString } from "@/lib/dates/local-date";
 
-type BulkAction = "schedule" | "product" | "status" | "delete";
+type BulkAction = "schedule" | "product" | "status" | "export" | "delete";
 
 type Props = {
   open: boolean;
@@ -41,6 +42,19 @@ type Props = {
   selectionLabel: string;
   onCompleted: () => void;
 };
+
+function downloadBase64File(fileName: string, mimeType: string, base64: string) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
 
 export function ClientBulkActionsModal({
   open,
@@ -54,6 +68,7 @@ export function ClientBulkActionsModal({
   const scheduleBulk = useServerFn(bulkScheduleClientsFn);
   const addProductBulk = useServerFn(bulkAddProductFn);
   const updateStatusBulk = useServerFn(bulkUpdateStatusFn);
+  const exportBulk = useServerFn(bulkExportClientsFn);
   const deleteBulk = useServerFn(bulkDeleteClientsFn);
   const listUsers = useServerFn(listUsersForBulkActionsFn);
 
@@ -100,20 +115,31 @@ export function ClientBulkActionsModal({
           data: { scope, targetUserId, contactDate: contactDateIso },
         });
         toast.success(`${result.affected} cliente(s) agendado(s).`);
+        onOpenChange(false);
+        onCompleted();
       } else if (action === "product") {
         if (!productId) throw new Error("Selecione o produto.");
         const result = await addProductBulk({ data: { scope, productId } });
         toast.success(`Produto vinculado a ${result.affected} cliente(s).`);
+        onOpenChange(false);
+        onCompleted();
       } else if (action === "status") {
         if (!statusId) throw new Error("Selecione o status.");
         const result = await updateStatusBulk({ data: { scope, status: statusId } });
         toast.success(`Status atualizado em ${result.affected} cliente(s).`);
+        onOpenChange(false);
+        onCompleted();
+      } else if (action === "export") {
+        const result = await exportBulk({ data: scope });
+        downloadBase64File(result.fileName, result.mimeType, result.base64);
+        toast.success(`Excel gerado com ${result.affected} lead(s).`);
+        onOpenChange(false);
       } else {
         const result = await deleteBulk({ data: scope });
         toast.success(`${result.affected} cliente(s) excluído(s).`);
+        onOpenChange(false);
+        onCompleted();
       }
-      onOpenChange(false);
-      onCompleted();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Falha na ação em lote.");
     } finally {
@@ -133,7 +159,7 @@ export function ClientBulkActionsModal({
         </DialogHeader>
 
         <div className="space-y-5">
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
             <Button
               type="button"
               variant={action === "schedule" ? "default" : "outline"}
@@ -160,6 +186,15 @@ export function ClientBulkActionsModal({
             >
               <ListChecks className="size-4 shrink-0" />
               <span>Alterar status</span>
+            </Button>
+            <Button
+              type="button"
+              variant={action === "export" ? "default" : "outline"}
+              className="h-auto min-h-10 justify-start whitespace-normal px-3 py-2 text-left"
+              onClick={() => setAction("export")}
+            >
+              <Download className="size-4 shrink-0" />
+              <span>Exportar</span>
             </Button>
             <Button
               type="button"
@@ -245,6 +280,21 @@ export function ClientBulkActionsModal({
             </div>
           ) : null}
 
+          {action === "export" ? (
+            <div className="space-y-2 rounded-lg border border-border/60 p-3 text-sm text-muted-foreground">
+              <p>
+                Gera e baixa um Excel (.xlsx) com todos os campos dos leads da seleção, no formato de
+                planilha/banco de dados (uma linha por lead).
+              </p>
+              <p>
+                As colunas <strong className="text-foreground">Telefone</strong> e{" "}
+                <strong className="text-foreground">WhatsApp</strong> saem só com dígitos no padrão
+                Evolution API (DDI 55), ex.:{" "}
+                <code className="text-foreground">5551999666841</code>.
+              </p>
+            </div>
+          ) : null}
+
           {action === "delete" ? (
             <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
               Exclui permanentemente os cadastros da seleção (e agendas/anexos vinculados). Apenas master.
@@ -262,7 +312,7 @@ export function ClientBulkActionsModal({
             disabled={loading || total === 0}
             onClick={() => void runAction()}
           >
-            Confirmar
+            {action === "export" ? "Baixar Excel" : "Confirmar"}
           </Button>
         </DialogFooter>
       </DialogContent>

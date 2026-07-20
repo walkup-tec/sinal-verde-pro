@@ -330,6 +330,79 @@ export async function bulkUpdateClientStatus(input: {
   return { affected: updated.length, clientIds: updated.map((row) => row.id) };
 }
 
+export async function listClientsForBulkExport(input: {
+  scope: ClientBulkScope;
+  actorUserId: string;
+  isMaster: boolean;
+}): Promise<
+  Array<{
+    id: string;
+    productId: string;
+    status: string;
+    createdAt: string;
+    produtos: string;
+    data: Partial<Record<string, string>>;
+  }>
+> {
+  const clientIds = await resolveClientIdsFromScope(input.scope, input.actorUserId, input.isMaster);
+  if (!isDatabaseEnabled()) {
+    throw new Error("Exportação em lote exige banco de dados ativo.");
+  }
+
+  const sql = await getSql();
+  const rows = await sql<
+    Array<{
+      id: string;
+      product_id: string;
+      status: string;
+      created_at: Date | string;
+      produtos: string | null;
+      data: Record<string, unknown> | null;
+    }>
+  >`
+    select
+      c.id,
+      c.product_id,
+      c.status,
+      c.created_at,
+      c.data,
+      coalesce(
+        (
+          select string_agg(p.name, ', ' order by p.name)
+          from crm.client_products cp
+          inner join crm.products p on p.id = cp.product_id
+          where cp.client_id = c.id
+        ),
+        (select p.name from crm.products p where p.id = c.product_id),
+        ''
+      ) as produtos
+    from crm.clients c
+    where c.id in ${sql(clientIds)}
+    order by c.created_at desc
+  `;
+
+  return rows.map((row) => {
+    const dataRaw = row.data && typeof row.data === "object" ? row.data : {};
+    const data: Partial<Record<string, string>> = {};
+    for (const [key, value] of Object.entries(dataRaw)) {
+      if (value == null) continue;
+      data[key] = typeof value === "string" ? value : String(value);
+    }
+    const createdAt =
+      row.created_at instanceof Date
+        ? row.created_at.toISOString()
+        : String(row.created_at ?? "");
+    return {
+      id: row.id,
+      productId: row.product_id,
+      status: row.status,
+      createdAt,
+      produtos: row.produtos ?? "",
+      data,
+    };
+  });
+}
+
 export function filtersFromClientsPageQuery(query: ClientsPageQuery): ClientBulkFilters {
   return {
     search: query.search,

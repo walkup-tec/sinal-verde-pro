@@ -4,6 +4,20 @@ export function phoneDigits(value: string): string {
 }
 
 /**
+ * Número no formato Evolution API / WABA (somente dígitos, com DDI 55 quando BR).
+ * Ex.: `(51) 99966-6841` → `5551999666841`
+ */
+export function normalizeEvoWhatsAppNumber(value: string): string {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length >= 12 && digits.startsWith("55")) return digits;
+  if (digits.length >= 10 && digits.length <= 11 && /^[1-9]\d/.test(digits)) {
+    return `55${digits}`;
+  }
+  return digits;
+}
+
+/**
  * Máscara de telefone com DDD:
  * (11) 3456-7890  |  (11) 91234-5678
  */
