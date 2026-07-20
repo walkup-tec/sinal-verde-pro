@@ -212,11 +212,28 @@ export async function deleteUserById(userId: string): Promise<void> {
 
   if (isDatabaseEnabled()) {
     const sql = await getSql();
-    const rows = await sql`
-      delete from crm.users where id = ${userId} and role <> 'master'
-      returning id
-    `;
-    if (rows.length === 0) throw new Error("Usuário não encontrado.");
+    await sql.begin(async (tx) => {
+      // Histórico de atendimento/anexo: mantém user_name e aponta FK ao master
+      await tx`
+        update crm.client_attendances
+        set user_id = ${MASTER_USER_ID}
+        where user_id = ${userId}
+      `;
+      await tx`
+        update crm.client_attachments
+        set user_id = ${MASTER_USER_ID}
+        where user_id = ${userId}
+      `;
+      // Agenda e atribuições do usuário saem junto
+      await tx`delete from crm.client_schedules where user_id = ${userId}`;
+      await tx`delete from crm.client_assignments where user_id = ${userId}`;
+
+      const rows = await tx`
+        delete from crm.users where id = ${userId} and role <> 'master'
+        returning id
+      `;
+      if (rows.length === 0) throw new Error("Usuário não encontrado.");
+    });
     return;
   }
 
