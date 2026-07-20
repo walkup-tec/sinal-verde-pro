@@ -1,0 +1,68 @@
+# Heal Sinal Verde após push/redeploy Easypanel.
+# Republica host :30310 + Traefik → 172.17.0.1:30310 (nunca :3000 = Easypanel).
+#
+# Secrets (GitHub → Settings → Secrets → Actions):
+#   VPS_SSH_PRIVATE_KEY  — obrigatório (mesma chave do WABA)
+#   VPS_HOST             — opcional; default 72.60.51.127
+#
+# Script VPS: walkup-tec/waba → scripts/heal-sinal-verde-pos-redeploy-vps.sh
+
+name: Heal Sinal Verde (pós-deploy)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  repository_dispatch:
+    types: [easypanel-sinal-verde-redeployed, heal-sinal-verde]
+
+concurrency:
+  group: heal-sinal-verde
+  cancel-in-progress: false
+
+jobs:
+  heal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Validar secrets
+        run: |
+          if [ -z "${{ secrets.VPS_SSH_PRIVATE_KEY }}" ]; then
+            echo "::error::VPS_SSH_PRIVATE_KEY ausente no repo sinal-verde-pro."
+            echo "Copie o secret do WABA (Settings → Secrets → Actions) para este repositório."
+            exit 1
+          fi
+
+      - name: Aguardar Easypanel build/redeploy (Docker)
+        run: sleep 90
+
+      - name: SSH — install watch+timer e post-deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST != '' && secrets.VPS_HOST || '72.60.51.127' }}
+          username: root
+          key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          port: 22
+          command_timeout: 15m
+          script: |
+            set -euo pipefail
+            REPO="https://raw.githubusercontent.com/walkup-tec/waba/master/scripts"
+            curl -fsSL "${REPO}/heal-sinal-verde-pos-redeploy-vps.sh" \
+              -o /tmp/heal-sinal-verde-pos-redeploy-vps.sh
+            sed -i 's/\r$//' /tmp/heal-sinal-verde-pos-redeploy-vps.sh
+            chmod +x /tmp/heal-sinal-verde-pos-redeploy-vps.sh
+            /tmp/heal-sinal-verde-pos-redeploy-vps.sh install
+            /tmp/heal-sinal-verde-pos-redeploy-vps.sh post-deploy || true
+            sleep 25
+            /tmp/heal-sinal-verde-pos-redeploy-vps.sh post-deploy
+            echo "--- status ---"
+            /tmp/heal-sinal-verde-pos-redeploy-vps.sh status
+            code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
+              --resolve acesso-sinalverde.com:443:127.0.0.1 \
+              https://acesso-sinalverde.com/ || echo 000)"
+            echo "https_sv=${code}"
+            case "$code" in
+              200|301|302|303|307|308) exit 0 ;;
+              *) exit 1 ;;
+            esac
