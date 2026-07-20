@@ -1,11 +1,12 @@
 # Heal Sinal Verde após push/redeploy Easypanel.
-# Republica host :30310 + Traefik → 172.17.0.1:30310 (nunca :3000 = Easypanel).
+# v7+: edge gateway waba_sinalverde_edge publica :30310 (CRM não).
+# Traefik → 172.17.0.1:30310 (nunca :3000 = Easypanel).
 #
 # Secrets (GitHub → Settings → Secrets → Actions):
 #   VPS_SSH_PRIVATE_KEY  — obrigatório (mesma chave do WABA)
 #   VPS_HOST             — opcional; default 72.60.51.127
 #
-# Script VPS: walkup-tec/waba → scripts/heal-sinal-verde-pos-redeploy-vps.sh
+# Scripts: walkup-tec/waba → sinal-verde-edge-gateway + heal-sinal-verde
 
 name: Heal Sinal Verde (pós-deploy)
 
@@ -33,11 +34,11 @@ jobs:
             exit 1
           fi
 
-      # Easypanel build Docker costuma demorar 2–6 min; heal cedo demais = 502 de novo
+      # Easypanel build Docker costuma demorar; edge já está up — espera CRM
       - name: Aguardar build/redeploy Easypanel
-        run: sleep 180
+        run: sleep 120
 
-      - name: SSH — install + post-deploy em loop (cobre janela Swarm)
+      - name: SSH — edge + heal (causa raiz)
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST != '' && secrets.VPS_HOST || '72.60.51.127' }}
@@ -48,6 +49,12 @@ jobs:
           script: |
             set -euo pipefail
             REPO="https://raw.githubusercontent.com/walkup-tec/waba/master/scripts"
+            curl -fsSL "${REPO}/sinal-verde-edge-gateway-vps.sh" \
+              -o /tmp/sinal-verde-edge-gateway-vps.sh
+            sed -i 's/\r$//' /tmp/sinal-verde-edge-gateway-vps.sh
+            chmod +x /tmp/sinal-verde-edge-gateway-vps.sh
+            /tmp/sinal-verde-edge-gateway-vps.sh install
+
             curl -fsSL "${REPO}/heal-sinal-verde-pos-redeploy-vps.sh" \
               -o /tmp/heal-sinal-verde-pos-redeploy-vps.sh
             sed -i 's/\r$//' /tmp/heal-sinal-verde-pos-redeploy-vps.sh
@@ -58,7 +65,6 @@ jobs:
             for i in 1 2 3 4 5 6; do
               echo "=== passagem post-deploy ${i}/6 ==="
               /tmp/heal-sinal-verde-pos-redeploy-vps.sh post-deploy || true
-              # restore explícito (Host → loadBalancer :30310)
               curl -fsSL "${REPO}/restore-easypanel-traefik-backends-vps.sh" \
                 -o /tmp/restore-backends.sh
               sed -i 's/\r$//' /tmp/restore-backends.sh
@@ -72,8 +78,9 @@ jobs:
               case "$code" in
                 200|301|302|303|307|308) ok=1; break ;;
               esac
-              sleep 45
+              sleep 30
             done
 
+            docker service ls --filter name=waba_sinalverde_edge --format '{{.Name}} {{.Replicas}} {{.Ports}}' || true
             /tmp/heal-sinal-verde-pos-redeploy-vps.sh status || true
             test "$ok" = "1"
