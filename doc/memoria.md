@@ -1,4 +1,12 @@
-﻿## 2026-07-16 — Fix Bun is not defined (Nitro NodeServer)
+﻿## 2026-07-20 — Server closed = healthcheck porta errada
+
+- Listening 3000 + Server closed = SIGTERM (healthcheck em 80?)
+- Ajuste Easypanel: healthcheck porta **3000**
+- Dockerfile: NITRO_HOST + HEALTHCHECK :3000
+- Keywords: `502`, `Server closed`, `healthcheck`, `3000`
+
+---
+## 2026-07-16 — Fix Bun is not defined (Nitro NodeServer)
 
 - Causa: build com `bun run` emitiu `Bun.serve`; runtime Node no Easypanel
 - Fix: `node vite build` + `preset: node-server`
@@ -342,5 +350,6 @@
 ## 2026-07-14 — Dashboard pie tooltip
 - Hover: quantidade + %; fontes menores (legend 10px)
 - Keywords: pie tooltip, percentual status
+
 
 

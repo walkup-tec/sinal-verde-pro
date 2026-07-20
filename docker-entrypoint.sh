@@ -32,4 +32,6 @@ fi
 cd "${APP_DIR}"
 export PORT
 export HOST="${HOST:-0.0.0.0}"
+export NITRO_HOST="${NITRO_HOST:-${HOST}}"
+export NITRO_PORT="${NITRO_PORT:-${PORT}}"
 exec node .output/server/index.mjs
