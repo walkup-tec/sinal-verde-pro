@@ -366,3 +366,5 @@
 
 
 
+
+- 2026-07-21: Perfil (role) agora segue a categoria (cat-master => master); autocorrecao em leitura/update (withDerivedRole); menu Usuarios liberado por categoria, nao por role fixo. Commit 481376b. Buscar: role segue categoria, withDerivedRole, menu usuarios dashboard.
