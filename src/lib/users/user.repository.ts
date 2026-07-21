@@ -1,8 +1,14 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { hashPassword } from "@/lib/auth/password";
-import { emailMatchesStored, MASTER_USER, MASTER_USER_ID, normalizeEmail } from "@/lib/auth/master-user";
-import type { PublicUser, StoredUser } from "@/lib/users/user.types";
+import {
+  emailMatchesStored,
+  MASTER_CATEGORY_ID,
+  MASTER_USER,
+  MASTER_USER_ID,
+  normalizeEmail,
+} from "@/lib/auth/master-user";
+import type { PublicUser, StoredUser, UserRole } from "@/lib/users/user.types";
 import { getSql, isDatabaseEnabled } from "@/lib/db/postgres";
 
 const DATA_DIR = join(process.cwd(), "data");
@@ -18,6 +24,18 @@ export type UpdateUserInput = {
 
 let cachedUsers: StoredUser[] | null = null;
 let cachedMasterUser: StoredUser | null = null;
+
+/** O perfil (role) segue a categoria: categoria Master ⇒ master. Não existe perfil separado. */
+export function roleForCategory(categoryId: string): UserRole {
+  return categoryId === MASTER_CATEGORY_ID ? "master" : "user";
+}
+
+/** Autocorrige usuários gravados com role divergente da categoria (ex.: Master salvo como "user"). */
+function withDerivedRole(user: StoredUser): StoredUser {
+  if (user.id === MASTER_USER_ID) return { ...user, role: "master" };
+  const role = roleForCategory(user.categoryId);
+  return user.role === role ? user : { ...user, role };
+}
 
 type UserRow = {
   id: string;
@@ -42,7 +60,7 @@ function toPublicUser(user: StoredUser): PublicUser {
 }
 
 function mapUserRow(row: UserRow): StoredUser {
-  return {
+  return withDerivedRole({
     id: row.id,
     email: row.email,
     name: row.name,
@@ -51,14 +69,16 @@ function mapUserRow(row: UserRow): StoredUser {
     passwordSaltB64: row.password_salt_b64,
     passwordHashB64: row.password_hash_b64,
     createdAt: row.created_at.toISOString(),
-  };
+  });
 }
 
 async function readStoredUsers(): Promise<StoredUser[]> {
   try {
     const raw = await readFile(USERS_FILE, "utf8");
     const parsed = JSON.parse(raw) as StoredUser[];
-    return Array.isArray(parsed) ? parsed.filter((u) => u.id !== MASTER_USER_ID) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((u) => u.id !== MASTER_USER_ID).map(withDerivedRole)
+      : [];
   } catch {
     return [];
   }
@@ -294,13 +314,13 @@ export async function updateUserById(userId: string, input: UpdateUserInput): Pr
     if (emailTakenByOther(allUsers, email, userId)) {
       throw new Error("Já existe um usuário com este e-mail.");
     }
-    const updated: StoredUser = {
+    const updated: StoredUser = withDerivedRole({
       ...current,
       name,
       email,
       categoryId,
       ...(passwordSaltB64 && passwordHashB64 ? { passwordSaltB64, passwordHashB64 } : {}),
-    };
+    });
     await upsertUserInPostgres(updated);
     return toPublicUser(updated);
   }
@@ -331,13 +351,13 @@ export async function updateUserById(userId: string, input: UpdateUserInput): Pr
     throw new Error("Já existe um usuário com este e-mail.");
   }
 
-  users[index] = {
+  users[index] = withDerivedRole({
     ...users[index],
     name,
     email,
     categoryId,
     ...(passwordSaltB64 && passwordHashB64 ? { passwordSaltB64, passwordHashB64 } : {}),
-  };
+  });
   cachedUsers = users;
   await writeStoredUsers(users);
   return toPublicUser(users[index]);

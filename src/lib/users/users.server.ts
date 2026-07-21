@@ -12,16 +12,20 @@ import {
   deleteUserById,
   findUserById,
   listAllUsers,
+  roleForCategory,
   updateUserById,
   updateUserPassword,
 } from "@/lib/users/user.repository";
 import type { StoredUser } from "@/lib/users/user.types";
 
-function requireMasterSession() {
+/** Acesso segue a categoria: master sempre pode; demais precisam do menu "usuarios". */
+function requireUsersMenuSession() {
   return getSession(sessionConfig).then((session) => {
     const user = session.data;
-    if (!user?.userId || user.role !== "master") {
-      throw new Error("Apenas usuários master podem gerenciar usuários.");
+    const allowed =
+      user?.userId && (user.role === "master" || user.menuIds?.includes("usuarios"));
+    if (!allowed) {
+      throw new Error("Sua categoria não tem acesso à gestão de usuários.");
     }
     return user;
   });
@@ -94,14 +98,14 @@ const updateUserSchema = (data: unknown) => {
 };
 
 export const listUsersFn = createServerFn({ method: "GET" }).handler(async () => {
-  await requireMasterSession();
+  await requireUsersMenuSession();
   return listAllUsers();
 });
 
 export const createUserFn = createServerFn({ method: "POST" })
   .inputValidator(createUserSchema)
   .handler(async ({ data }) => {
-    await requireMasterSession();
+    await requireUsersMenuSession();
     const categoryId = await assertCategoryId(data.categoryId);
     const settings = await loadSystemSettingsFromDisk();
     const categoryName =
@@ -112,7 +116,7 @@ export const createUserFn = createServerFn({ method: "POST" })
       email: data.email,
       name: data.name,
       categoryId,
-      role: "user",
+      role: roleForCategory(categoryId),
       passwordSaltB64: saltB64,
       passwordHashB64: hashB64,
       createdAt: new Date().toISOString(),
@@ -133,7 +137,7 @@ export const createUserFn = createServerFn({ method: "POST" })
 export const deleteUserFn = createServerFn({ method: "POST" })
   .inputValidator(userIdSchema)
   .handler(async ({ data }) => {
-    await requireMasterSession();
+    await requireUsersMenuSession();
     await deleteUserById(data.userId);
     return { ok: true as const };
   });
@@ -141,7 +145,7 @@ export const deleteUserFn = createServerFn({ method: "POST" })
 export const updateUserFn = createServerFn({ method: "POST" })
   .inputValidator(updateUserSchema)
   .handler(async ({ data }) => {
-    await requireMasterSession();
+    await requireUsersMenuSession();
     const categoryId = await assertCategoryId(data.categoryId);
     return updateUserById(data.userId, {
       name: data.name,
@@ -154,7 +158,7 @@ export const updateUserFn = createServerFn({ method: "POST" })
 export const resendPasswordFn = createServerFn({ method: "POST" })
   .inputValidator(userIdSchema)
   .handler(async ({ data }) => {
-    await requireMasterSession();
+    await requireUsersMenuSession();
     const existing = await findUserById(data.userId);
     if (!existing) throw new Error("Usuário não encontrado.");
     const temporaryPassword = generateTemporaryPassword();

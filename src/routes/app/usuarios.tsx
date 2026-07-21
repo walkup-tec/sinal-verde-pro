@@ -2,12 +2,14 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { UserCog } from "lucide-react";
 import { UsersManagement } from "@/components/users/users-management";
 import { getAuthSessionFn } from "@/lib/auth/auth.server";
+import { sessionCanAccessMenu } from "@/lib/auth/menu-access";
 import { listUsersFn } from "@/lib/users/users.server";
 
 export const Route = createFileRoute("/app/usuarios")({
   beforeLoad: async () => {
     const auth = await getAuthSessionFn();
-    if (!auth || auth.role !== "master") {
+    // Acesso segue a categoria: quem tem o menu "usuarios" na categoria entra.
+    if (!auth || !sessionCanAccessMenu(auth, "usuarios")) {
       throw redirect({ to: "/app" });
     }
   },

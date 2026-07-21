@@ -57,6 +57,7 @@ function sessionNeedsPersist(session: SessionData, next: SessionData): boolean {
   return (
     session.name !== next.name ||
     session.email !== next.email ||
+    session.role !== next.role ||
     session.categoryId !== next.categoryId ||
     session.menuIds.join(",") !== next.menuIds.join(",") ||
     session.homeMenuId !== next.homeMenuId
