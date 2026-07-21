@@ -115,7 +115,7 @@ function LoginPage() {
                 name="email"
                 type="email"
                 autoComplete="username"
-                placeholder="mozart@sinalverde.com"
+                placeholder="Informe e-mail"
                 required
               />
             </div>
