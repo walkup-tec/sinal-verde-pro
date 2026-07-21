@@ -368,3 +368,5 @@
 
 
 - 2026-07-21: Perfil (role) agora segue a categoria (cat-master => master); autocorrecao em leitura/update (withDerivedRole); menu Usuarios liberado por categoria, nao por role fixo. Commit 481376b. Buscar: role segue categoria, withDerivedRole, menu usuarios dashboard.
+
+- 2026-07-21: HSTS no app (server.ts) max-age=1y includeSubDomains só via X-Forwarded-Proto=https. Buscar: HSTS, Não seguro.
