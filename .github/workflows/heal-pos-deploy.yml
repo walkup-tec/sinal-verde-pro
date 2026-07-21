@@ -1,12 +1,12 @@
-# Heal Sinal Verde após push/redeploy Easypanel.
-# v7+: edge gateway waba_sinalverde_edge publica :30310 (CRM não).
-# Traefik → 172.17.0.1:30310 (nunca :3000 = Easypanel).
+# Heal Sinal Verde após push/redeploy Easypanel — ISOLADO.
+# v8: NÃO chama restore-easypanel-traefik-backends (patchava main.yaml e derrubava Traefik/WABA).
+# Só: publish :30310 + sinal-verde.yaml + strip seguro de chaves SV no main + path watch.
 #
 # Secrets (GitHub → Settings → Secrets → Actions):
-#   VPS_SSH_PRIVATE_KEY  — obrigatório (mesma chave do WABA)
+#   VPS_SSH_PRIVATE_KEY  — obrigatório
 #   VPS_HOST             — opcional; default 72.60.51.127
 #
-# Scripts: walkup-tec/waba → sinal-verde-edge-gateway + heal-sinal-verde
+# Script canônico: walkup-tec/waba → scripts/heal-sinal-verde-pos-redeploy-vps.sh
 
 name: Heal Sinal Verde (pós-deploy)
 
@@ -25,7 +25,7 @@ concurrency:
 jobs:
   heal:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
       - name: Validar secrets
         run: |
@@ -34,43 +34,48 @@ jobs:
             exit 1
           fi
 
-      # Easypanel build Docker costuma demorar; edge já está up — espera CRM
+      # Easypanel build Docker costuma demorar
       - name: Aguardar build/redeploy Easypanel
-        run: sleep 120
+        run: sleep 90
 
-      - name: SSH — edge + heal (causa raiz)
+      - name: SSH — heal isolado (sem tocar backends WABA)
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST != '' && secrets.VPS_HOST || '72.60.51.127' }}
           username: root
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: 22
-          command_timeout: 20m
+          command_timeout: 15m
           script: |
             set -euo pipefail
             REPO="https://raw.githubusercontent.com/walkup-tec/waba/master/scripts"
-            curl -fsSL "${REPO}/sinal-verde-edge-gateway-vps.sh" \
-              -o /tmp/sinal-verde-edge-gateway-vps.sh
-            sed -i 's/\r$//' /tmp/sinal-verde-edge-gateway-vps.sh
-            chmod +x /tmp/sinal-verde-edge-gateway-vps.sh
-            /tmp/sinal-verde-edge-gateway-vps.sh install
 
             curl -fsSL "${REPO}/heal-sinal-verde-pos-redeploy-vps.sh" \
               -o /tmp/heal-sinal-verde-pos-redeploy-vps.sh
             sed -i 's/\r$//' /tmp/heal-sinal-verde-pos-redeploy-vps.sh
             chmod +x /tmp/heal-sinal-verde-pos-redeploy-vps.sh
-            /tmp/heal-sinal-verde-pos-redeploy-vps.sh install || true
+
+            # Instala timer + watch docker + path unit (main.yaml → strip SV imediato)
+            /tmp/heal-sinal-verde-pos-redeploy-vps.sh install
 
             ok=0
             for i in 1 2 3 4 5 6; do
               echo "=== passagem post-deploy ${i}/6 ==="
               /tmp/heal-sinal-verde-pos-redeploy-vps.sh post-deploy || true
-              curl -fsSL "${REPO}/restore-easypanel-traefik-backends-vps.sh" \
-                -o /tmp/restore-backends.sh
-              sed -i 's/\r$//' /tmp/restore-backends.sh
-              chmod +x /tmp/restore-backends.sh
-              bash /tmp/restore-backends.sh || true
-              sleep 15
+
+              # Guarda: WABA NÃO pode cair por causa deste heal
+              waba="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 12 \
+                https://wabadisparos.com.br/ || echo 000)"
+              echo "wabadisparos=${waba}"
+              case "$waba" in
+                200|301|302|303|307|308) ;;
+                *)
+                  echo "::error::WABA caiu durante heal SV — abort (isolação falhou)"
+                  /tmp/heal-sinal-verde-pos-redeploy-vps.sh status || true
+                  exit 1
+                  ;;
+              esac
+
               code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
                 --resolve acesso-sinalverde.com:443:127.0.0.1 \
                 https://acesso-sinalverde.com/ || echo 000)"
@@ -78,9 +83,8 @@ jobs:
               case "$code" in
                 200|301|302|303|307|308) ok=1; break ;;
               esac
-              sleep 30
+              sleep 25
             done
 
-            docker service ls --filter name=waba_sinalverde_edge --format '{{.Name}} {{.Replicas}} {{.Ports}}' || true
             /tmp/heal-sinal-verde-pos-redeploy-vps.sh status || true
             test "$ok" = "1"
