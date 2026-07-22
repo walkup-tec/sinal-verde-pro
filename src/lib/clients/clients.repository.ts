@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ClientFieldId } from "@/lib/config/client-fields";
+import { MASTER_USER_ID } from "@/lib/auth/master-user";
 import { loadSystemSettingsFromDisk } from "@/lib/config/settings.repository";
 import { listAllUsers } from "@/lib/users/user.repository";
 import { clientFieldLabel } from "@/lib/config/client-fields";
@@ -559,21 +560,23 @@ async function insertClientsInPostgres(records: ClientRecord[]): Promise<void> {
 
 export async function resolveAssignedUserIds(distribution: LeadDistribution): Promise<string[]> {
   const users = await listAllUsers();
-  const operational = users.filter((user) => user.role !== "master");
+  // "Todos os usuários" = todos os usuários reais. Conta sistema fica de fora.
+  // Não filtrar por role=master: categoria Master também precisa receber leads na atribuição.
+  const recipients = users.filter((user) => user.id !== MASTER_USER_ID);
 
   if (distribution.type === "all") {
-    return operational.map((user) => user.id);
+    return recipients.map((user) => user.id);
   }
 
   if (distribution.type === "category") {
-    const settings = await loadSystemSettingsFromDisk();
     const categorySet = new Set(distribution.categoryIds);
-    return operational
+    return recipients
       .filter((user) => categorySet.has(user.categoryId))
       .map((user) => user.id);
   }
 
-  return distribution.userIds;
+  const selected = new Set(distribution.userIds);
+  return recipients.filter((user) => selected.has(user.id)).map((user) => user.id);
 }
 
 /** Dono do agendamento: preferir atendente da distribuição; senão fallback (quem importou). */

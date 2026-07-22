@@ -1,4 +1,10 @@
-﻿## 2026-07-22 — Fix distribuição: usuários específicos vazios
+﻿## 2026-07-22 — Fix "Nenhum usuário elegível" na distribuição "todos"
+- Causa: `resolveAssignedUserIds` excluía `role=master` → lista vazia com categorias Master
+- Fix: destinatários = todos exceto conta sistema (`MASTER_USER_ID`)
+- LOG: `doc/LOG-2026-07-22__114800__fix-distribuicao-todos-usuarios-elegiveis.md`
+- Keywords: `Nenhum usuário elegível`, `Para todos os usuários`, `resolveAssignedUserIds`
+
+## 2026-07-22 — Fix distribuição: usuários específicos vazios
 - Causa: `listUsersForImportFn` excluía `role=master` + `category_id` nulo virava Master
 - Fix: lista todos (exceto conta sistema) + MultiSelectFilter + toast de erro
 - LOG: `doc/LOG-2026-07-22__113500__fix-distribuicao-usuarios-especificos.md`
