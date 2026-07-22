@@ -1,4 +1,9 @@
-﻿## 2026-07-22 — Fix "Nenhum usuário elegível" na distribuição "todos"
+﻿## 2026-07-22 — Campo financeiro Data do contrato
+- `data_contrato` em Dados financeiros + máscara dd/mm/aaaa
+- LOG: `doc/LOG-2026-07-22__153500__campo-data-do-contrato.md`
+- Keywords: `data_contrato`, `Data do contrato`, `financeiros`
+
+## 2026-07-22 — Fix "Nenhum usuário elegível" na distribuição "todos"
 - Causa: `resolveAssignedUserIds` excluía `role=master` → lista vazia com categorias Master
 - Fix: destinatários = todos exceto conta sistema (`MASTER_USER_ID`)
 - LOG: `doc/LOG-2026-07-22__114800__fix-distribuicao-todos-usuarios-elegiveis.md`

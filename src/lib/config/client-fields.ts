@@ -58,6 +58,8 @@ export type ClientFieldId =
 
   | "valor_liberado"
 
+  | "data_contrato"
+
   | "data_ultima_parcela"
 
   | "banco";
@@ -191,6 +193,8 @@ export const CLIENT_FIELD_GROUPS: ClientFieldGroup[] = [
       { id: "valor_desejado", label: "Valor desejado" },
 
       { id: "valor_liberado", label: "Valor liberado" },
+
+      { id: "data_contrato", label: "Data do contrato", hint: "Formato dd/mm/aaaa" },
 
       { id: "data_ultima_parcela", label: "Data última parcela", hint: "Formato dd/mm/aaaa" },
 

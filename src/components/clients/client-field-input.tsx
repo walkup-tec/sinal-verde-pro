@@ -25,7 +25,11 @@ type Props = {
   required?: boolean;
 };
 
-const DATE_FIELD_IDS = new Set<ClientFieldId>(["data_nascimento", "data_ultima_parcela"]);
+const DATE_FIELD_IDS = new Set<ClientFieldId>([
+  "data_nascimento",
+  "data_contrato",
+  "data_ultima_parcela",
+]);
 const PHONE_FIELD_IDS = new Set<ClientFieldId>(["telefone", "whatsapp"]);
 const CURRENCY_FIELD_IDS = new Set<ClientFieldId>([
   "renda_mensal",
