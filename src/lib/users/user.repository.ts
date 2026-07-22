@@ -33,6 +33,10 @@ export function roleForCategory(categoryId: string): UserRole {
 /** Autocorrige usuários gravados com role divergente da categoria (ex.: Master salvo como "user"). */
 function withDerivedRole(user: StoredUser): StoredUser {
   if (user.id === MASTER_USER_ID) return { ...user, role: "master" };
+  // Sem categoria: não promover a Master (null/vazio no banco ≠ cat-master).
+  if (!user.categoryId?.trim()) {
+    return { ...user, role: user.role === "master" ? "master" : "user" };
+  }
   const role = roleForCategory(user.categoryId);
   return user.role === role ? user : { ...user, role };
 }
@@ -64,8 +68,9 @@ function mapUserRow(row: UserRow): StoredUser {
     id: row.id,
     email: row.email,
     name: row.name,
-    categoryId: row.category_id ?? MASTER_USER.categoryId,
-    role: row.role as StoredUser["role"],
+    // Nunca defaultar category_id nulo para cat-master — isso zerava a lista de distribuição.
+    categoryId: row.category_id?.trim() || "",
+    role: (row.role as StoredUser["role"]) || "user",
     passwordSaltB64: row.password_salt_b64,
     passwordHashB64: row.password_hash_b64,
     createdAt: row.created_at.toISOString(),

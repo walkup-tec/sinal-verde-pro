@@ -1,4 +1,10 @@
-﻿## 2026-07-20 — Valor liberado na lista + Export Remarketing
+﻿## 2026-07-22 — Fix distribuição: usuários específicos vazios
+- Causa: `listUsersForImportFn` excluía `role=master` + `category_id` nulo virava Master
+- Fix: lista todos (exceto conta sistema) + MultiSelectFilter + toast de erro
+- LOG: `doc/LOG-2026-07-22__113500__fix-distribuicao-usuarios-especificos.md`
+- Keywords: `importar`, `distribuição`, `usuários específicos`, `multi-select`, `Thiago`
+
+## 2026-07-20 — Valor liberado na lista + Export Remarketing
 - Lista clientes: coluna Valor liberado (antes de Status) — `---` ou `R$`
 - Remarketing: botão Exportar (mesmo Excel do modal Clientes)
 - Modal Exportar: removida frase Evolution API

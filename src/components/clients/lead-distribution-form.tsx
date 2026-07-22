@@ -1,7 +1,8 @@
+import { useMemo } from "react";
 import { DatePickerField } from "@/components/ui/date-picker-field";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Checkbox } from "@/components/ui/checkbox";
+import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
 import type { LeadDistribution } from "@/lib/clients/client.types";
 import type { UserCategory } from "@/lib/config/settings-types";
 
@@ -37,6 +38,23 @@ export function LeadDistributionForm({
   scheduleContactDate = "",
   onScheduleContactDateChange,
 }: Props) {
+  const categoryOptions = useMemo(
+    () =>
+      [...categories]
+        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }))
+        .map((category) => ({ value: category.id, label: category.name })),
+    [categories],
+  );
+
+  const userOptions = useMemo(
+    () =>
+      users.map((user) => ({
+        value: user.id,
+        label: `${user.name} (${user.email})`,
+      })),
+    [users],
+  );
+
   return (
     <div className="space-y-4">
       <Label>Distribuição de leads</Label>
@@ -60,39 +78,29 @@ export function LeadDistributionForm({
 
       {distributionType === "category" ? (
         <div className="space-y-2 rounded-lg border border-border/60 p-3">
-          {categories.map((category) => (
-            <label key={category.id} className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={categoryIds.includes(category.id)}
-                onCheckedChange={(checked) => {
-                  onCategoryIdsChange(
-                    checked
-                      ? [...categoryIds, category.id]
-                      : categoryIds.filter((id) => id !== category.id),
-                  );
-                }}
-              />
-              {category.name}
-            </label>
-          ))}
+          <Label>Categorias</Label>
+          <MultiSelectFilter
+            allLabel="Selecionar categorias"
+            emptyLabel="Nenhuma categoria cadastrada"
+            options={categoryOptions}
+            values={categoryIds}
+            onChange={onCategoryIdsChange}
+            className="w-full sm:w-full"
+          />
         </div>
       ) : null}
 
       {distributionType === "users" ? (
-        <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-border/60 p-3">
-          {users.map((user) => (
-            <label key={user.id} className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={userIds.includes(user.id)}
-                onCheckedChange={(checked) => {
-                  onUserIdsChange(
-                    checked ? [...userIds, user.id] : userIds.filter((id) => id !== user.id),
-                  );
-                }}
-              />
-              {user.name} ({user.email})
-            </label>
-          ))}
+        <div className="space-y-2 rounded-lg border border-border/60 p-3">
+          <Label>Usuários</Label>
+          <MultiSelectFilter
+            allLabel="Selecionar usuários"
+            emptyLabel="Nenhum usuário disponível para distribuição"
+            options={userOptions}
+            values={userIds}
+            onChange={onUserIdsChange}
+            className="w-full sm:w-full"
+          />
         </div>
       ) : null}
 

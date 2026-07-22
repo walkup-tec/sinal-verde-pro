@@ -44,6 +44,7 @@ import {
   updateClientStatus,
 } from "@/lib/clients/clients.repository";
 import { loadSystemSettingsFromDisk } from "@/lib/config/settings.repository";
+import { MASTER_USER_ID } from "@/lib/auth/master-user";
 import { findUserById, listAllUsers } from "@/lib/users/user.repository";
 import type {
   ClientBulkFilters,
@@ -629,8 +630,11 @@ export const createClientAttendanceFn = createServerFn({ method: "POST" })
 export const listUsersForImportFn = createServerFn({ method: "GET" }).handler(async () => {
   await requireClientesAccess();
   const users = await listAllUsers();
+  // Inclui todos os usuários reais (inclusive Master de categoria).
+  // Só exclui a conta sistema. Quem importa precisa conseguir escolher destinatários.
   return users
-    .filter((user) => user.role !== "master")
+    .filter((user) => user.id !== MASTER_USER_ID)
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }))
     .map((user) => ({
       id: user.id,
       name: user.name,

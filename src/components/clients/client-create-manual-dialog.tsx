@@ -66,8 +66,15 @@ export function ClientCreateManualDialog({ open, onOpenChange, onCreated }: Prop
   useEffect(() => {
     if (!open) return;
     listUsers()
-      .then(setImportUsers)
-      .catch(() => setImportUsers([]));
+      .then((users) => setImportUsers(Array.isArray(users) ? users : []))
+      .catch((err) => {
+        setImportUsers([]);
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Não foi possível carregar a lista de usuários para distribuição.",
+        );
+      });
   }, [open, listUsers]);
 
   const reset = () => {
