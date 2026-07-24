@@ -187,6 +187,8 @@ async function executeImportJob(jobId: string): Promise<void> {
 
           status: "novo",
 
+          contractStatus: "",
+
           createdAt,
 
         }));

@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Settings2, Shield, Package, Landmark, ListChecks } from "lucide-react";
+import { Settings2, Shield, Package, Landmark, ListChecks, Workflow } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserCategoriesSettings } from "@/components/settings/user-categories-settings";
 import { ProductsSettings } from "@/components/settings/products-settings";
 import { AttendanceStatusesSettings } from "@/components/settings/attendance-statuses-settings";
 import { BanksSettings } from "@/components/settings/banks-settings";
+import { OperationsSettings } from "@/components/settings/operations-settings";
 import { useSystemSettings } from "@/hooks/use-system-settings";
 
 export const Route = createFileRoute("/app/configuracoes")({
@@ -23,7 +24,7 @@ function ConfiguracoesPage() {
         </div>
         <h2 className="font-display text-2xl font-bold tracking-tight">Configurações</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Categorias de usuários, produtos, bancos, status de atendimento e regras de cadastro.
+          Categorias de usuários, produtos, bancos, operação, status e regras de cadastro.
         </p>
       </div>
 
@@ -38,8 +39,11 @@ function ConfiguracoesPage() {
           <TabsTrigger value="bancos" className="gap-2">
             <Landmark className="size-4" /> Bancos
           </TabsTrigger>
+          <TabsTrigger value="operacao" className="gap-2">
+            <Workflow className="size-4" /> Operação
+          </TabsTrigger>
           <TabsTrigger value="status-atendimento" className="gap-2">
-            <ListChecks className="size-4" /> Status de atendimento
+            <ListChecks className="size-4" /> Status
           </TabsTrigger>
         </TabsList>
 
@@ -64,12 +68,17 @@ function ConfiguracoesPage() {
           />
         </TabsContent>
 
+        <TabsContent value="operacao">
+          <OperationsSettings
+            settings={settings}
+            onChange={(next) => setSettings(next, "operations")}
+          />
+        </TabsContent>
+
         <TabsContent value="status-atendimento">
           <AttendanceStatusesSettings
             settings={settings}
-            onChange={(next) => {
-              void setSettings(next, "attendanceStatuses");
-            }}
+            onChange={(next) => setSettings(next, "attendanceStatuses")}
           />
         </TabsContent>
       </Tabs>

@@ -23,6 +23,7 @@ import {
   type KanbanPeriodPreset,
 } from "@/lib/clients/kanban-board";
 import {
+  attendanceKindStatuses,
   resolveAttendanceStatusColor,
   resolveAttendanceStatusLabel,
 } from "@/lib/clients/client-status";
@@ -260,11 +261,11 @@ export function KanbanScreen({ initialView, initialItems }: Props) {
 
   const statusOptions = useMemo(
     () =>
-      settings.attendanceStatuses.map((status) => ({
+      attendanceKindStatuses(settings).map((status) => ({
         value: status.id,
         label: status.label,
       })),
-    [settings.attendanceStatuses],
+    [settings],
   );
 
   const filteredItems = useMemo(() => {
@@ -274,12 +275,17 @@ export function KanbanScreen({ initialView, initialItems }: Props) {
     return filterKanbanItemsByStatuses(items, statusFilter);
   }, [view, items, period, statusFilter]);
 
+  const attendanceStatusesForBoard = useMemo(
+    () => attendanceKindStatuses(settings),
+    [settings],
+  );
+
   const columns = useMemo(
     () =>
       view === "monthly"
         ? []
-        : buildKanbanColumns(view, filteredItems, settings.attendanceStatuses),
-    [view, filteredItems, settings.attendanceStatuses],
+        : buildKanbanColumns(view, filteredItems, attendanceStatusesForBoard),
+    [view, filteredItems, attendanceStatusesForBoard],
   );
 
   const statusGrid = useMemo(

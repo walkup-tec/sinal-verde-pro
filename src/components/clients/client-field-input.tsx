@@ -7,7 +7,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { ClientFieldId } from "@/lib/config/client-fields";
-import type { BankConfig } from "@/lib/config/settings-types";
+import type { BankConfig, OperationConfig } from "@/lib/config/settings-types";
 import { maskDateBr } from "@/lib/dates/date-mask";
 import { BRAZIL_UFS } from "@/lib/geo/brazil-ufs";
 import { maskCurrencyBrl } from "@/lib/masks/br-currency";
@@ -21,6 +21,7 @@ type Props = {
   value: string;
   onChange: (value: string) => void;
   banks: BankConfig[];
+  operations?: OperationConfig[];
   id?: string;
   required?: boolean;
 };
@@ -38,7 +39,15 @@ const CURRENCY_FIELD_IDS = new Set<ClientFieldId>([
   "margem_disponivel",
 ]);
 
-export function ClientFieldInput({ fieldId, value, onChange, banks, id, required }: Props) {
+export function ClientFieldInput({
+  fieldId,
+  value,
+  onChange,
+  banks,
+  operations = [],
+  id,
+  required,
+}: Props) {
   if (fieldId === "banco" && banks.length > 0) {
     return (
       <Select value={value || undefined} onValueChange={onChange}>
@@ -63,6 +72,35 @@ export function ClientFieldInput({ fieldId, value, onChange, banks, id, required
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder="Cadastre bancos em Configurações"
+        required={required}
+      />
+    );
+  }
+
+  if (fieldId === "operacao" && operations.length > 0) {
+    return (
+      <Select value={value || undefined} onValueChange={onChange}>
+        <SelectTrigger id={id} className="w-full">
+          <SelectValue placeholder="Selecione a operação" />
+        </SelectTrigger>
+        <SelectContent>
+          {operations.map((operation) => (
+            <SelectItem key={operation.id} value={operation.name}>
+              {operation.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
+
+  if (fieldId === "operacao") {
+    return (
+      <Input
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="Cadastre operações em Configurações"
         required={required}
       />
     );

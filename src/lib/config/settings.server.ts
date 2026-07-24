@@ -13,6 +13,7 @@ const SECTIONS = new Set<SettingsSaveSection>([
   "categories",
   "products",
   "banks",
+  "operations",
   "attendanceStatuses",
   "all",
 ]);

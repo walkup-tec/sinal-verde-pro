@@ -204,6 +204,7 @@ export function ClientCreateManualDialog({ open, onOpenChange, onCreated }: Prop
                     value={formData[field.id] ?? ""}
                     onChange={(value) => setField(field.id, value)}
                     banks={settings.banks ?? []}
+                    operations={settings.operations ?? []}
                     required
                   />
                 </div>
@@ -221,6 +222,7 @@ export function ClientCreateManualDialog({ open, onOpenChange, onCreated }: Prop
                       value={formData[field.id] ?? ""}
                       onChange={(value) => setField(field.id, value)}
                       banks={settings.banks ?? []}
+                    operations={settings.operations ?? []}
                     />
                   </div>
                 ))}

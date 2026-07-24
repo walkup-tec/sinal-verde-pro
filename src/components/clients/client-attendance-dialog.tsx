@@ -22,7 +22,11 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useSystemSettings } from "@/hooks/use-system-settings";
-import { attendanceStatuses } from "@/lib/clients/client-status";
+import {
+  attendanceKindStatuses,
+  statusesOfKind,
+  type StatusKind,
+} from "@/lib/clients/client-status";
 import {
   createClientAttendanceFn,
   deleteClientAttendanceFn,
@@ -114,9 +118,11 @@ export function ClientAttendanceDialog({
   const [attendances, setAttendances] = useState<ClientAttendanceRecord[]>([]);
   const [note, setNote] = useState("");
   const [statusValue, setStatusValue] = useState("novo");
+  const [contractStatusValue, setContractStatusValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
+  const [savingContractStatus, setSavingContractStatus] = useState(false);
 
   const getClientDetailRef = useRef(getClientDetail);
   const listAttendancesRef = useRef(listAttendances);
@@ -131,6 +137,7 @@ export function ClientAttendanceDialog({
     setAttendances([]);
     setNote("");
     setStatusValue("novo");
+    setContractStatusValue("");
     setLoading(false);
   }, [open]);
 
@@ -148,6 +155,7 @@ export function ClientAttendanceDialog({
         if (cancelled) return;
         setClient(detail);
         setStatusValue(detail.status);
+        setContractStatusValue(detail.contractStatus ?? "");
         setAttendances(history);
       })
       .catch((error) => {
@@ -174,7 +182,14 @@ export function ClientAttendanceDialog({
     [client, catalogGroups],
   );
 
-  const statusOptions = useMemo(() => attendanceStatuses(settings), [settings]);
+  const attendanceStatusOptions = useMemo(
+    () => attendanceKindStatuses(settings),
+    [settings],
+  );
+  const contractStatusOptions = useMemo(
+    () => statusesOfKind(settings, "contrato"),
+    [settings],
+  );
 
   const handleCopyContact = (label: string, value: string) => {
     void copyText(value, `${label} copiado.`);
@@ -186,34 +201,65 @@ export function ClientAttendanceDialog({
     void copyText(payload, "Dados de contato copiados.");
   };
 
-  const handleStatusChange = async (nextStatus: string) => {
-    if (!clientId || nextStatus === statusValue) return;
+  const applyStatusChange = async (
+    nextStatus: string,
+    kind: StatusKind,
+    currentValue: string,
+    setValue: (value: string) => void,
+    setSavingFlag: (value: boolean) => void,
+  ) => {
+    if (!clientId || nextStatus === currentValue) return;
 
-    setSavingStatus(true);
+    setSavingFlag(true);
     try {
-      const result = await updateStatus({ data: { clientId, status: nextStatus } });
-      setStatusValue(result.client.status);
-      setClient((current) => (current ? { ...current, status: result.client.status } : current));
+      const result = await updateStatus({
+        data: { clientId, status: nextStatus, kind },
+      });
+      const nextClientValue =
+        kind === "contrato" ? result.client.contractStatus : result.client.status;
+      setValue(nextClientValue);
+      setClient((current) =>
+        current
+          ? kind === "contrato"
+            ? { ...current, contractStatus: result.client.contractStatus }
+            : { ...current, status: result.client.status }
+          : current,
+      );
       setAttendances((current) => [result.attendance, ...current]);
-      onStatusChange?.(clientId, result.client.status);
+      if (kind === "atendimento") {
+        onStatusChange?.(clientId, result.client.status);
+      }
       onActivityChange?.(clientId, {
         hasAttendance: true,
         ...(result.scheduleContactDate ? { hasSchedule: true } : {}),
       });
+      const kindLabel = kind === "contrato" ? "Status de contrato" : "Status de atendimento";
       if (result.scheduleContactDate) {
         const [, month, day] = result.scheduleContactDate.split("-");
         toast.success(
-          `Status atualizado. Retorno automático na Agenda em ${day}/${month}.`,
+          `${kindLabel} atualizado. Retorno automático na Agenda em ${day}/${month}.`,
         );
       } else {
-        toast.success("Status atualizado e registrado no histórico.");
+        toast.success(`${kindLabel} atualizado e registrado no histórico.`);
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o status.");
     } finally {
-      setSavingStatus(false);
+      setSavingFlag(false);
     }
   };
+
+  const handleStatusChange = (nextStatus: string) =>
+    applyStatusChange(nextStatus, "atendimento", statusValue, setStatusValue, setSavingStatus);
+
+  const handleContractStatusChange = (nextStatus: string) =>
+    applyStatusChange(
+      nextStatus,
+      "contrato",
+      contractStatusValue,
+      setContractStatusValue,
+      setSavingContractStatus,
+    );
 
   const handleSubmit = async () => {
     if (!clientId || !note.trim()) {
@@ -376,13 +422,40 @@ export function ClientAttendanceDialog({
                         <SelectValue placeholder="Selecione o status" />
                       </SelectTrigger>
                       <SelectContent>
-                        {statusOptions.map((status) => (
+                        {attendanceStatusOptions.map((status) => (
                           <SelectItem key={status.id} value={status.id}>
                             {status.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="contract-status">Status de contrato</Label>
+                    {contractStatusOptions.length === 0 ? (
+                      <p className="rounded-lg border border-dashed border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                        Nenhum status de contrato cadastrado. Cadastre em Configurações → Status
+                        (tipo Contrato).
+                      </p>
+                    ) : (
+                      <Select
+                        value={contractStatusValue || undefined}
+                        onValueChange={(value) => void handleContractStatusChange(value)}
+                        disabled={savingContractStatus || !clientId}
+                      >
+                        <SelectTrigger id="contract-status" className="w-full">
+                          <SelectValue placeholder="Selecione o status de contrato" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {contractStatusOptions.map((status) => (
+                            <SelectItem key={status.id} value={status.id}>
+                              {status.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
                   <Separator />

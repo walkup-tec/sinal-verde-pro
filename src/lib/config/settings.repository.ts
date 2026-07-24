@@ -5,6 +5,7 @@ import { DEFAULT_SYSTEM_SETTINGS, normalizeSettings } from "@/lib/config/setting
 import type {
   AttendanceStatusConfig,
   BankConfig,
+  OperationConfig,
   ProductConfig,
   SystemSettings,
   UserCategory,
@@ -21,6 +22,7 @@ export type SettingsSaveSection =
   | "categories"
   | "products"
   | "banks"
+  | "operations"
   | "attendanceStatuses"
   | "all";
 
@@ -53,10 +55,29 @@ async function loadSystemSettingsFromPostgres(): Promise<SystemSettings> {
     alter table crm.user_categories
     add column if not exists home_menu_id text not null default 'dashboard'
   `;
+  await sql`
+    alter table crm.attendance_statuses
+    add column if not exists kind text not null default 'atendimento'
+  `;
   await ensureFieldCatalogTable(sql);
+  await sql`
+    create table if not exists crm.operations (
+      id text primary key,
+      name text not null,
+      updated_at timestamptz not null default now()
+    )
+  `;
 
-  const [categories, menus, products, productFields, banks, attendanceStatuses, fieldCatalog] =
-    await Promise.all([
+  const [
+    categories,
+    menus,
+    products,
+    productFields,
+    banks,
+    operations,
+    attendanceStatuses,
+    fieldCatalog,
+  ] = await Promise.all([
     sql<{ id: string; name: string; home_menu_id: string | null }[]>`
       select id, name, home_menu_id from crm.user_categories order by name
     `,
@@ -72,10 +93,20 @@ async function loadSystemSettingsFromPostgres(): Promise<SystemSettings> {
     sql<{ id: string; name: string }[]>`
       select id, name from crm.banks order by name
     `,
+    sql<{ id: string; name: string }[]>`
+      select id, name from crm.operations order by name
+    `,
     sql<
-      { id: string; label: string; color: string | null; auto_return_days: number | null; sort_order: number }[]
+      {
+        id: string;
+        label: string;
+        color: string | null;
+        auto_return_days: number | null;
+        kind: string | null;
+        sort_order: number;
+      }[]
     >`
-      select id, label, color, auto_return_days, sort_order
+      select id, label, color, auto_return_days, kind, sort_order
       from crm.attendance_statuses
       order by sort_order, label
     `,
@@ -116,11 +147,13 @@ async function loadSystemSettingsFromPostgres(): Promise<SystemSettings> {
       };
     }),
     banks: banks.map((bank) => ({ id: bank.id, name: bank.name })),
+    operations: operations.map((operation) => ({ id: operation.id, name: operation.name })),
     attendanceStatuses: attendanceStatuses.map((status) => ({
       id: status.id,
       label: status.label,
       color: status.color ?? "#64748b",
       autoReturnDays: status.auto_return_days,
+      kind: status.kind === "contrato" ? "contrato" : "atendimento",
     })),
     fieldGroups: Array.isArray(fieldCatalog[0]?.groups_json)
       ? fieldCatalog[0].groups_json
@@ -283,6 +316,33 @@ async function syncBanks(tx: Tx, banks: BankConfig[]): Promise<void> {
   `;
 }
 
+async function syncOperations(tx: Tx, operations: OperationConfig[]): Promise<void> {
+  if (operations.length === 0) {
+    await tx`delete from crm.operations`;
+    return;
+  }
+
+  const payload = operations.map((operation) => ({ id: operation.id, name: operation.name }));
+
+  await tx`
+    with input as (
+      select * from jsonb_to_recordset(${tx.json(payload)}) as x(id text, name text)
+    ),
+    del_operations as (
+      delete from crm.operations o
+      where not exists (select 1 from input i where i.id = o.id)
+      returning 1
+    ),
+    upsert_operations as (
+      insert into crm.operations (id, name, updated_at)
+      select id, name, now() from input
+      on conflict (id) do update set name = excluded.name, updated_at = now()
+      returning id
+    )
+    select 1
+  `;
+}
+
 async function syncAttendanceStatuses(tx: Tx, statuses: AttendanceStatusConfig[]): Promise<void> {
   if (statuses.length === 0) {
     await tx`delete from crm.attendance_statuses`;
@@ -294,6 +354,7 @@ async function syncAttendanceStatuses(tx: Tx, statuses: AttendanceStatusConfig[]
     label: status.label,
     color: status.color,
     auto_return_days: status.autoReturnDays,
+    kind: status.kind,
     sort_order: index + 1,
   }));
 
@@ -301,7 +362,7 @@ async function syncAttendanceStatuses(tx: Tx, statuses: AttendanceStatusConfig[]
     with input as (
       select *
       from jsonb_to_recordset(${tx.json(payload)}) as x(
-        id text, label text, color text, auto_return_days int, sort_order int
+        id text, label text, color text, auto_return_days int, kind text, sort_order int
       )
     ),
     del_statuses as (
@@ -310,12 +371,13 @@ async function syncAttendanceStatuses(tx: Tx, statuses: AttendanceStatusConfig[]
       returning 1
     ),
     upsert_statuses as (
-      insert into crm.attendance_statuses (id, label, color, auto_return_days, sort_order, updated_at)
-      select id, label, color, auto_return_days, sort_order, now() from input
+      insert into crm.attendance_statuses (id, label, color, auto_return_days, kind, sort_order, updated_at)
+      select id, label, color, auto_return_days, kind, sort_order, now() from input
       on conflict (id) do update set
         label = excluded.label,
         color = excluded.color,
         auto_return_days = excluded.auto_return_days,
+        kind = excluded.kind,
         sort_order = excluded.sort_order,
         updated_at = now()
       returning id
@@ -333,6 +395,7 @@ function mergeSettingsForSection(
     categories: section === "all" || section === "categories" ? incoming.categories : base.categories,
     products: section === "all" || section === "products" ? incoming.products : base.products,
     banks: section === "all" || section === "banks" ? incoming.banks : base.banks,
+    operations: section === "all" || section === "operations" ? incoming.operations : base.operations,
     attendanceStatuses:
       section === "all" || section === "attendanceStatuses"
         ? incoming.attendanceStatuses
@@ -350,6 +413,18 @@ async function saveSystemSettingsToPostgres(
   const base = cachedSettings ?? (await loadSystemSettingsFromPostgres());
   const next = mergeSettingsForSection(base, incoming, section);
   const sql = await getSql();
+  await ensureFieldCatalogTable(sql);
+  await sql`
+    alter table crm.attendance_statuses
+    add column if not exists kind text not null default 'atendimento'
+  `;
+  await sql`
+    create table if not exists crm.operations (
+      id text primary key,
+      name text not null,
+      updated_at timestamptz not null default now()
+    )
+  `;
 
   await sql.begin(async (tx) => {
     if (section === "all" || section === "categories") {
@@ -362,13 +437,18 @@ async function saveSystemSettingsToPostgres(
     if (section === "all" || section === "banks") {
       await syncBanks(tx, next.banks);
     }
+    if (section === "all" || section === "operations") {
+      await syncOperations(tx, next.operations);
+    }
     if (section === "all" || section === "attendanceStatuses") {
       await syncAttendanceStatuses(tx, next.attendanceStatuses);
     }
   });
 
-  cachedSettings = next;
-  return next;
+  // Recarrega do Postgres para garantir que o que a UI vê é o que foi gravado.
+  cachedSettings = null;
+  cachedSettings = await loadSystemSettingsFromPostgres();
+  return cachedSettings;
 }
 
 export async function loadSystemSettingsFromDisk(): Promise<SystemSettings> {

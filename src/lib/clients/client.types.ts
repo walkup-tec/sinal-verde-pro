@@ -20,7 +20,10 @@ export type ClientRecord = {
   assignedUserIds: string[];
   distribution: LeadDistribution;
   display: ClientImportDisplay;
+  /** Status de atendimento (kind = atendimento). */
   status: string;
+  /** Status de contrato (kind = contrato); vazio até o usuário definir. */
+  contractStatus: string;
   createdAt: string;
 };
 

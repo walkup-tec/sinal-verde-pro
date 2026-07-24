@@ -73,11 +73,35 @@ export const CLIENT_FIELD_GROUPS: ClientFieldGroup[] = [
         label: "Banco",
         hint: "Opcional em todos os produtos; opções em Configurações → Bancos",
       },
+      {
+        id: "operacao",
+        label: "Operação",
+        hint: "Opcional em todos os produtos; opções em Configurações → Operação",
+      },
     ],
   },
 ];
 
 export const ALL_CLIENT_FIELD_IDS = CLIENT_FIELD_GROUPS.flatMap((g) => g.fields.map((f) => f.id));
+
+/**
+ * Campos com dependências no código (listas, contatos, export EVO, Configurações).
+ * Só estes mostram escudo e não podem ser excluídos — outros do catálogo padrão podem.
+ */
+export const SYSTEM_CLIENT_FIELD_IDS = new Set<ClientFieldId>([
+  "nome",
+  "cpf",
+  "telefone",
+  "whatsapp",
+  "email",
+  "valor_liberado",
+  "banco",
+  "operacao",
+]);
+
+export function isSystemClientField(id: ClientFieldId): boolean {
+  return SYSTEM_CLIENT_FIELD_IDS.has(id);
+}
 
 /** IDs removidos ou renomeados — usado na migração de produtos salvos. */
 export const LEGACY_CLIENT_FIELD_IDS: Record<string, ClientFieldId | null> = {

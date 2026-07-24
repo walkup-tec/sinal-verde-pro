@@ -34,7 +34,9 @@ import { buildBulkClientsExportWorkbook } from "@/lib/clients/client-bulk-export
 import {
   attendanceStatuses,
   isValidAttendanceStatus,
+  isValidStatusOfKind,
   resolveAttendanceStatusLabel,
+  type StatusKind,
 } from "@/lib/clients/client-status";
 import {
   createManualClient,
@@ -366,16 +368,24 @@ export const getClientDetailFn = createServerFn({ method: "POST" })
 export const updateClientStatusFn = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => {
     if (!data || typeof data !== "object") throw new Error("Dados inválidos.");
-    const payload = data as { clientId?: string; status?: string };
+    const payload = data as { clientId?: string; status?: string; kind?: string };
     if (!payload.clientId?.trim()) throw new Error("Cliente inválido.");
     if (!payload.status?.trim()) throw new Error("Status inválido.");
-    return { clientId: payload.clientId.trim(), status: payload.status.trim() };
+    const kind: StatusKind =
+      payload.kind === "contrato" ? "contrato" : "atendimento";
+    return {
+      clientId: payload.clientId.trim(),
+      status: payload.status.trim(),
+      kind,
+    };
   })
   .handler(async ({ data }) => {
     const user = await requireClientesAccess();
     const settings = await loadSystemSettingsFromDisk();
-    if (!isValidAttendanceStatus(data.status, settings)) {
-      throw new Error("Status de atendimento inválido.");
+    if (!isValidStatusOfKind(data.status, settings, data.kind)) {
+      throw new Error(
+        data.kind === "contrato" ? "Status de contrato inválido." : "Status de atendimento inválido.",
+      );
     }
 
     const previous = await getClientByIdForUser(
@@ -385,15 +395,22 @@ export const updateClientStatusFn = createServerFn({ method: "POST" })
     );
     if (!previous) throw new Error("Cliente não encontrado.");
 
+    const field = data.kind === "contrato" ? "contractStatus" : "status";
+    const previousValue =
+      data.kind === "contrato" ? previous.contractStatus || "" : previous.status;
+
     const client = await updateClientStatus(
       data.clientId,
       user.userId,
       user.role === "master",
       data.status,
+      field,
     );
 
     const statusLabel = resolveAttendanceStatusLabel(data.status, settings);
-    const previousLabel = resolveAttendanceStatusLabel(previous.status, settings);
+    const previousLabel = previousValue
+      ? resolveAttendanceStatusLabel(previousValue, settings)
+      : "—";
     const author = await findUserById(user.userId);
     const userName = author?.name ?? author?.email ?? "Usuário";
 
@@ -422,17 +439,18 @@ export const updateClientStatusFn = createServerFn({ method: "POST" })
       autoReturnNote = ` Retorno automático agendado para ${d}/${m}/${y} (${autoReturnDays} dia(s)).`;
     }
 
+    const kindLabel = data.kind === "contrato" ? "Status de contrato" : "Status de atendimento";
     const attendance = await createClientAttendance({
       clientId: data.clientId,
       userId: user.userId,
       userName,
       note:
-        (previous.status === data.status
-          ? `Status definido como: ${statusLabel}`
-          : `Status alterado para: ${statusLabel} (antes: ${previousLabel})`) + autoReturnNote,
+        (previousValue === data.status
+          ? `${kindLabel} definido como: ${statusLabel}`
+          : `${kindLabel} alterado para: ${statusLabel} (antes: ${previousLabel})`) + autoReturnNote,
     });
 
-    return { client, attendance, scheduleContactDate };
+    return { client, attendance, scheduleContactDate, kind: data.kind };
   });
 
 export const listClientAttendancesFn = createServerFn({ method: "POST" })

@@ -1,7 +1,9 @@
 import {
   ALL_CLIENT_FIELD_IDS,
+  CLIENT_FIELD_GROUPS,
   cloneDefaultFieldGroups,
   fieldIdsFromGroups,
+  isSystemClientField,
   LEGACY_CLIENT_FIELD_IDS,
   type ClientFieldGroup,
   type ClientFieldId,
@@ -11,6 +13,7 @@ import { resolveCategoryHomeMenuId } from "@/lib/config/category-utils";
 import type {
   AttendanceStatusConfig,
   BankConfig,
+  OperationConfig,
   SystemSettings,
   UserCategory,
 } from "@/lib/config/settings-types";
@@ -21,11 +24,23 @@ const atendenteCategoryId = "cat-atendente";
 const gerenteCategoryId = "cat-gerente";
 
 export const DEFAULT_ATTENDANCE_STATUSES: AttendanceStatusConfig[] = [
-  { id: "novo", label: "Novo", color: "#3b82f6", autoReturnDays: null },
-  { id: "em_atendimento", label: "Em atendimento", color: "#f59e0b", autoReturnDays: null },
-  { id: "aguardando_retorno", label: "Aguardando retorno", color: "#8b5cf6", autoReturnDays: 3 },
-  { id: "concluido", label: "Concluído", color: "#22c55e", autoReturnDays: null },
-  { id: "perdido", label: "Perdido", color: "#ef4444", autoReturnDays: null },
+  { id: "novo", label: "Novo", color: "#3b82f6", autoReturnDays: null, kind: "atendimento" },
+  {
+    id: "em_atendimento",
+    label: "Em atendimento",
+    color: "#f59e0b",
+    autoReturnDays: null,
+    kind: "atendimento",
+  },
+  {
+    id: "aguardando_retorno",
+    label: "Aguardando retorno",
+    color: "#8b5cf6",
+    autoReturnDays: 3,
+    kind: "atendimento",
+  },
+  { id: "concluido", label: "Concluído", color: "#22c55e", autoReturnDays: null, kind: "atendimento" },
+  { id: "perdido", label: "Perdido", color: "#ef4444", autoReturnDays: null, kind: "atendimento" },
 ];
 
 export const AUTO_RETURN_DAYS_OPTIONS = [1, 2, 3, 5, 7, 10, 14, 15, 21, 30, 45, 60] as const;
@@ -76,6 +91,7 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
     },
   ],
   banks: [],
+  operations: [],
   attendanceStatuses: [...DEFAULT_ATTENDANCE_STATUSES],
   fieldGroups: cloneDefaultFieldGroups(),
 };
@@ -97,6 +113,13 @@ export function createEmptyProduct(
 export function createEmptyBank(): BankConfig {
   return {
     id: `bank-${crypto.randomUUID().slice(0, 8)}`,
+    name: "",
+  };
+}
+
+export function createEmptyOperation(): OperationConfig {
+  return {
+    id: `op-${crypto.randomUUID().slice(0, 8)}`,
     name: "",
   };
 }
@@ -179,6 +202,45 @@ export function normalizeFieldGroups(groups: ClientFieldGroup[] | undefined | nu
   return normalized.length > 0 ? normalized : cloneDefaultFieldGroups();
 }
 
+/**
+ * Garante campos essenciais (escudo) e novos built-ins críticos (ex.: operacao)
+ * em catálogos já salvos. Campos padrão não essenciais removidos pelo master permanecem fora.
+ */
+export function mergeBuiltinFieldsIntoGroups(groups: ClientFieldGroup[]): ClientFieldGroup[] {
+  const existingIds = new Set(fieldIdsFromGroups(groups));
+  const result = groups.map((group) => ({
+    ...group,
+    fields: group.fields.map((field) => ({ ...field })),
+  }));
+  const byId = new Map(result.map((group) => [group.id, group]));
+
+  for (const seed of CLIENT_FIELD_GROUPS) {
+    const missingEssential = seed.fields.filter(
+      (field) => isSystemClientField(field.id) && !existingIds.has(field.id),
+    );
+    if (missingEssential.length === 0) continue;
+
+    let current = byId.get(seed.id);
+    if (!current) {
+      current = {
+        id: seed.id,
+        title: seed.title,
+        fields: missingEssential.map((field) => ({ ...field })),
+      };
+      result.push(current);
+      byId.set(seed.id, current);
+    } else {
+      for (const field of missingEssential) {
+        current.fields.push({ ...field });
+      }
+    }
+
+    for (const field of missingEssential) existingIds.add(field.id);
+  }
+
+  return result;
+}
+
 /** Garante campos válidos (todos disponíveis por padrão, exceto os obrigatórios) e categorias válidas. */
 export function normalizeSettings(settings: SystemSettings & { defaultCategoryId?: string }): SystemSettings {
   const rawCategories =
@@ -198,13 +260,14 @@ export function normalizeSettings(settings: SystemSettings & { defaultCategoryId
     };
   });
 
-  const fieldGroups = normalizeFieldGroups(settings.fieldGroups);
+  const fieldGroups = mergeBuiltinFieldsIntoGroups(normalizeFieldGroups(settings.fieldGroups));
   const catalogIds = fieldIdsFromGroups(fieldGroups);
   const products = (settings.products ?? []).map((p) => normalizeProductFields(p, catalogIds));
   const banks = normalizeBanks(settings.banks ?? []);
+  const operations = normalizeOperations(settings.operations ?? []);
   const attendanceStatuses = normalizeAttendanceStatuses(settings.attendanceStatuses ?? []);
 
-  return { categories, products, banks, attendanceStatuses, fieldGroups };
+  return { categories, products, banks, operations, attendanceStatuses, fieldGroups };
 }
 
 export function createEmptyAttendanceStatus(): AttendanceStatusConfig {
@@ -213,7 +276,13 @@ export function createEmptyAttendanceStatus(): AttendanceStatusConfig {
     label: "",
     color: DEFAULT_STATUS_COLOR,
     autoReturnDays: null,
+    kind: "atendimento",
   };
+}
+
+function normalizeStatusKind(value: unknown, fallback: AttendanceStatusConfig["kind"]): AttendanceStatusConfig["kind"] {
+  if (value === "contrato" || value === "atendimento") return value;
+  return fallback;
 }
 
 export function normalizeAttendanceStatuses(
@@ -226,13 +295,16 @@ export function normalizeAttendanceStatuses(
       const id = String(status.id ?? `status-${crypto.randomUUID().slice(0, 8)}`).trim();
       const fallback = defaultById.get(id)?.color ?? DEFAULT_STATUS_COLOR;
       const defaultDays = defaultById.get(id)?.autoReturnDays ?? null;
+      const defaultKind = defaultById.get(id)?.kind ?? "atendimento";
       const rawDays = (status as { autoReturnDays?: unknown }).autoReturnDays;
+      const rawKind = (status as { kind?: unknown }).kind;
       return {
         id,
         label: String(status.label ?? "").trim(),
         color: normalizeStatusColor(status.color, fallback),
         autoReturnDays:
           rawDays === undefined ? defaultDays : normalizeAutoReturnDays(rawDays),
+        kind: normalizeStatusKind(rawKind, defaultKind),
       };
     })
     .filter((status) => {
@@ -255,6 +327,22 @@ export function normalizeBanks(banks: BankConfig[]): BankConfig[] {
     .filter((bank) => {
       if (!bank.name) return false;
       const key = bank.name.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+export function normalizeOperations(operations: OperationConfig[]): OperationConfig[] {
+  const seen = new Set<string>();
+  return operations
+    .map((operation) => ({
+      id: String(operation.id ?? `op-${crypto.randomUUID().slice(0, 8)}`),
+      name: String(operation.name ?? "").trim(),
+    }))
+    .filter((operation) => {
+      if (!operation.name) return false;
+      const key = operation.name.toLowerCase();
       if (seen.has(key)) return false;
       seen.add(key);
       return true;

@@ -61,6 +61,7 @@ type ClientRow = {
   product_id: string;
   import_batch_id: string | null;
   status: string;
+  contract_status: string | null;
   data: Record<string, string>;
   distribution: LeadDistribution;
   display: ClientRecord["display"];
@@ -73,7 +74,12 @@ async function readClientsFromDisk(): Promise<ClientRecord[]> {
   try {
     const raw = await readFile(CLIENTS_FILE, "utf8");
     const parsed = JSON.parse(raw) as ClientRecord[];
-    cachedClients = Array.isArray(parsed) ? parsed : [];
+    cachedClients = Array.isArray(parsed)
+      ? parsed.map((client) => ({
+          ...client,
+          contractStatus: client.contractStatus ?? "",
+        }))
+      : [];
   } catch {
     cachedClients = [];
   }
@@ -201,6 +207,7 @@ function mapClientRow(row: ClientRow): ClientRecord {
     distribution: row.distribution,
     display: row.display,
     status: row.status || "novo",
+    contractStatus: row.contract_status ?? "",
     createdAt: row.created_at.toISOString(),
   };
 }
@@ -471,6 +478,7 @@ async function listClientsPageFromDisk(
 
 async function listClientsFromPostgres(userId: string, isMaster: boolean): Promise<ClientRecord[]> {
   const sql = await getSql();
+  await ensureClientContractStatusColumn(sql);
   const rows = isMaster
     ? await sql<ClientRow[]>`
         select
@@ -478,6 +486,7 @@ async function listClientsFromPostgres(userId: string, isMaster: boolean): Promi
           c.product_id,
           c.import_batch_id,
           c.status,
+          c.contract_status,
           c.data,
           c.distribution,
           c.display,
@@ -494,6 +503,7 @@ async function listClientsFromPostgres(userId: string, isMaster: boolean): Promi
           c.product_id,
           c.import_batch_id,
           c.status,
+          c.contract_status,
           c.data,
           c.distribution,
           c.display,
@@ -509,9 +519,17 @@ async function listClientsFromPostgres(userId: string, isMaster: boolean): Promi
   return rows.map(mapClientRow);
 }
 
+async function ensureClientContractStatusColumn(sql: Awaited<ReturnType<typeof getSql>>): Promise<void> {
+  await sql`
+    alter table crm.clients
+    add column if not exists contract_status text not null default ''
+  `;
+}
+
 async function insertClientsInPostgres(records: ClientRecord[]): Promise<void> {
   if (records.length === 0) return;
   const sql = await getSql();
+  await ensureClientContractStatusColumn(sql);
   const now = new Date();
 
   const clientRows = records.map((record) => ({
@@ -519,6 +537,7 @@ async function insertClientsInPostgres(records: ClientRecord[]): Promise<void> {
     product_id: record.productId,
     import_batch_id: record.importBatchId,
     status: record.status,
+    contract_status: record.contractStatus ?? "",
     data: record.data,
     distribution: record.distribution,
     display: record.display,
@@ -541,6 +560,7 @@ async function insertClientsInPostgres(records: ClientRecord[]): Promise<void> {
         "product_id",
         "import_batch_id",
         "status",
+        "contract_status",
         "data",
         "distribution",
         "display",
@@ -648,6 +668,7 @@ export async function importClients(payload: ImportClientsPayload): Promise<{ im
     distribution: payload.distribution,
     display: payload.display,
     status: "novo",
+    contractStatus: "",
     createdAt,
   }));
 
@@ -718,6 +739,7 @@ export async function createManualClient(payload: CreateManualClientPayload): Pr
     distribution: payload.distribution,
     display: { mode: "table", visibleFieldIds: filledFieldIds },
     status: "novo",
+    contractStatus: "",
     createdAt: new Date().toISOString(),
   };
 
@@ -753,6 +775,7 @@ async function getClientFromPostgres(
   isMaster: boolean,
 ): Promise<ClientRecord | null> {
   const sql = await getSql();
+  await ensureClientContractStatusColumn(sql);
   const rows = isMaster
     ? await sql<ClientRow[]>`
         select
@@ -760,6 +783,7 @@ async function getClientFromPostgres(
           c.product_id,
           c.import_batch_id,
           c.status,
+          c.contract_status,
           c.data,
           c.distribution,
           c.display,
@@ -777,6 +801,7 @@ async function getClientFromPostgres(
           c.product_id,
           c.import_batch_id,
           c.status,
+          c.contract_status,
           c.data,
           c.distribution,
           c.display,
@@ -1451,6 +1476,7 @@ export async function updateClientStatus(
   userId: string,
   isMaster: boolean,
   status: string,
+  field: "status" | "contractStatus" = "status",
 ): Promise<ClientRecord> {
   const trimmed = status.trim();
   if (!trimmed) throw new Error("Status inválido.");
@@ -1460,6 +1486,15 @@ export async function updateClientStatus(
 
   if (isDatabaseEnabled()) {
     const sql = await getSql();
+    await ensureClientContractStatusColumn(sql);
+    if (field === "contractStatus") {
+      await sql`
+        update crm.clients
+        set contract_status = ${trimmed}
+        where id = ${clientId}
+      `;
+      return { ...client, contractStatus: trimmed };
+    }
     await sql`
       update crm.clients
       set status = ${trimmed}
@@ -1470,8 +1505,14 @@ export async function updateClientStatus(
 
   const clients = await readClientsFromDisk();
   const next = clients.map((item) =>
-    item.id === clientId ? { ...item, status: trimmed } : item,
+    item.id === clientId
+      ? field === "contractStatus"
+        ? { ...item, contractStatus: trimmed }
+        : { ...item, status: trimmed }
+      : item,
   );
   await writeClientsToDisk(next);
-  return { ...client, status: trimmed };
+  return field === "contractStatus"
+    ? { ...client, contractStatus: trimmed }
+    : { ...client, status: trimmed };
 }

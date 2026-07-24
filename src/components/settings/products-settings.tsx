@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getRouteApi } from "@tanstack/react-router";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Shield, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import {
   allocateUniqueFieldId,
   fieldIdsFromGroups,
+  isSystemClientField,
   type ClientFieldGroup,
   type ClientFieldId,
 } from "@/lib/config/client-fields";
@@ -189,6 +190,11 @@ export function ProductsSettings({ settings, onChange }: Props) {
   const confirmDeleteField = async () => {
     if (!isMaster || !pendingFieldDelete) return;
     const { groupId, fieldId } = pendingFieldDelete;
+    if (isSystemClientField(fieldId)) {
+      toast.error("Campos padrão do sistema não podem ser excluídos.");
+      setPendingFieldDelete(null);
+      return;
+    }
     const totalFields = catalogIds.length;
     if (totalFields <= 1) {
       toast.error("Mantenha ao menos um campo no catálogo.");
@@ -384,7 +390,9 @@ export function ProductsSettings({ settings, onChange }: Props) {
                 <>
                   {" "}
                   Como <strong className="text-foreground">Master</strong>, você também pode editar o título das seções
-                  e acrescentar ou excluir campos.
+                  e acrescentar ou excluir campos. Campos com{" "}
+                  <Shield className="mx-0.5 inline size-3.5 align-text-bottom text-muted-foreground" aria-hidden />{" "}
+                  são essenciais do sistema (listas, contatos, export, Bancos/Operação) e não podem ser excluídos.
                 </>
               ) : null}
             </div>
@@ -428,10 +436,20 @@ export function ProductsSettings({ settings, onChange }: Props) {
                           group.fields.map((field) => {
                             const required = selected.requiredFieldIds.includes(field.id);
                             const available = !required;
+                            const isSystemField = isSystemClientField(field.id);
                             return (
                               <tr key={field.id} className="border-t border-border/60">
                                 <td className="px-4 py-3">
-                                  <div className="font-medium">{field.label}</div>
+                                  <div className="flex items-center gap-1.5 font-medium">
+                                    <span>{field.label}</span>
+                                    {isSystemField ? (
+                                      <Shield
+                                        className="size-3.5 shrink-0 text-muted-foreground"
+                                        aria-label="Campo essencial do sistema"
+                                        title="Campo essencial — exclusão quebraria listas, contatos ou integrações"
+                                      />
+                                    ) : null}
+                                  </div>
                                   {field.hint ? (
                                     <div className="text-xs text-muted-foreground">{field.hint}</div>
                                   ) : null}
@@ -451,23 +469,25 @@ export function ProductsSettings({ settings, onChange }: Props) {
                                 </td>
                                 {isMaster ? (
                                   <td className="px-2 py-3 text-center">
-                                    <Button
-                                      type="button"
-                                      size="icon"
-                                      variant="ghost"
-                                      className="size-8 text-destructive hover:text-destructive"
-                                      disabled={saving}
-                                      title="Excluir campo"
-                                      onClick={() =>
-                                        setPendingFieldDelete({
-                                          groupId: group.id,
-                                          fieldId: field.id,
-                                          label: field.label,
-                                        })
-                                      }
-                                    >
-                                      <Trash2 className="size-4" />
-                                    </Button>
+                                    {isSystemField ? null : (
+                                      <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="ghost"
+                                        className="size-8 text-destructive hover:text-destructive"
+                                        disabled={saving}
+                                        title="Excluir campo"
+                                        onClick={() =>
+                                          setPendingFieldDelete({
+                                            groupId: group.id,
+                                            fieldId: field.id,
+                                            label: field.label,
+                                          })
+                                        }
+                                      >
+                                        <Trash2 className="size-4" />
+                                      </Button>
+                                    )}
                                   </td>
                                 ) : null}
                               </tr>

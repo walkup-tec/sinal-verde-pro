@@ -1,4 +1,21 @@
-﻿## 2026-07-24 — Login master no host local
+﻿## 2026-07-24 — Configurações: Operação (como Bancos)
+- Aba Operação + campo produto `operacao` (select como banco)
+- Tabela `crm.operations`; merge built-in no catálogo de campos
+- LOG: `doc/LOG-2026-07-24__122200__config-operacao-como-bancos.md`
+- Keywords: `operacao`, `operations`, Configurações
+
+## 2026-07-24 — Status: Atendimento vs Contrato
+- Título da aba/seção: Status; kind obrigatório (bolinhas); `contractStatus` no cliente
+- LOG: `doc/LOG-2026-07-24__121500__status-atendimento-contrato.md`
+- Keywords: `status`, `contrato`, `kind`, `contractStatus`
+
+## 2026-07-24 — Produtos: seções/campos editáveis (master)
+- Master edita títulos de seção e acrescenta/exclui campos em Configurações → Produtos
+- Persistência: `settings.fieldGroups` + tabela `crm.client_field_catalog`
+- LOG: `doc/LOG-2026-07-24__120500__produtos-secoes-campos-editaveis-master.md`
+- Keywords: `fieldGroups`, `client_field_catalog`, produtos, master, seções
+
+## 2026-07-24 — Login master no host local
 - Alias `mozart.pmo@gmail.com` → master Mozart; input login aceita legado sem @
 - Guia: `doc/AMBIENTE-HOST-LOCAL.md` (seção Login master)
 - Keywords: `login`, `master`, `localhost`, `mozart.pmo`

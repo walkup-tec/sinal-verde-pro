@@ -31,6 +31,7 @@ import {
 } from "@/lib/clients/clients.server";
 import type { ClientBulkScope } from "@/lib/clients/client.types";
 import { useSystemSettings } from "@/hooks/use-system-settings";
+import { attendanceKindStatuses } from "@/lib/clients/client-status";
 import { localDateString } from "@/lib/dates/local-date";
 import { downloadBase64File } from "@/lib/utils/download-base64";
 
@@ -79,7 +80,9 @@ export function ClientBulkActionsModal({
         setTotal(countResult.total);
         setUsers(userList);
         setTargetUserId((current) => current || userList[0]?.id || "");
-        setStatusId((current) => current || settings.attendanceStatuses[0]?.id || "");
+        setStatusId(
+          (current) => current || attendanceKindStatuses(settings)[0]?.id || "",
+        );
       })
       .catch((error) => {
         toast.error(error instanceof Error ? error.message : "Não foi possível carregar a seleção.");
@@ -90,7 +93,7 @@ export function ClientBulkActionsModal({
     return () => {
       active = false;
     };
-  }, [open, scope, countBulk, listUsers, settings.attendanceStatuses]);
+  }, [open, scope, countBulk, listUsers, settings]);
 
   const runAction = async () => {
     if (!scope) return;
@@ -254,7 +257,7 @@ export function ClientBulkActionsModal({
                   <SelectValue placeholder="Selecione o status" />
                 </SelectTrigger>
                 <SelectContent>
-                  {settings.attendanceStatuses.map((status) => (
+                  {attendanceKindStatuses(settings).map((status) => (
                     <SelectItem key={status.id} value={status.id}>
                       {status.label}
                     </SelectItem>

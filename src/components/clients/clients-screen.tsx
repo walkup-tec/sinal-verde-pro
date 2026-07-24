@@ -15,6 +15,7 @@ import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
 import { useSystemSettings } from "@/hooks/use-system-settings";
 import { listClientsFn } from "@/lib/clients/clients.server";
 import {
+  attendanceKindStatuses,
   resolveAttendanceStatusColor,
   resolveAttendanceStatusLabel,
 } from "@/lib/clients/client-status";
@@ -362,7 +363,7 @@ export function ClientsScreen({ initialPage }: Props) {
                 values={statusFilter}
                 disabled={loading}
                 onChange={applyStatusFilter}
-                options={settings.attendanceStatuses.map((status) => ({
+                options={attendanceKindStatuses(settings).map((status) => ({
                   value: status.id,
                   label: status.label,
                 }))}

@@ -21,6 +21,15 @@ export type BankConfig = {
   name: string;
 };
 
+/** Opções cadastradas em Configurações → Operação (mesmo formato de bancos). */
+export type OperationConfig = {
+  id: string;
+  name: string;
+};
+
+/** Classificação do status cadastrado em Configurações → Status. */
+export type StatusKind = "atendimento" | "contrato";
+
 export type AttendanceStatusConfig = {
   id: string;
   label: string;
@@ -31,12 +40,15 @@ export type AttendanceStatusConfig = {
    * Ao aplicar o status, agenda contato para o usuário que atribuiu.
    */
   autoReturnDays: number | null;
+  /** Atendimento (fluxo comercial) ou Contrato — obrigatório no cadastro. */
+  kind: StatusKind;
 };
 
 export type SystemSettings = {
   categories: UserCategory[];
   products: ProductConfig[];
   banks: BankConfig[];
+  operations: OperationConfig[];
   attendanceStatuses: AttendanceStatusConfig[];
   /** Catálogo de seções/campos editável pelo master (Produtos). */
   fieldGroups: ClientFieldGroup[];
