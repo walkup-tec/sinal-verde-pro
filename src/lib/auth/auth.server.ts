@@ -31,7 +31,11 @@ const loginInputSchema = (data: unknown) => {
     throw new Error("Informe e-mail e senha.");
   }
   const normalized = normalizeEmail(email);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) && normalized !== "mozart.sinalverde.com") {
+  // Aceita legado sem @ (mozart.sinalverde.com) além de e-mails normais.
+  if (
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) &&
+    normalized !== "mozart.sinalverde.com"
+  ) {
     throw new Error("Informe um e-mail válido.");
   }
   return { email: normalized, password };

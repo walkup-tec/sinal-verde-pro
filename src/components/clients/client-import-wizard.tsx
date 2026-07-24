@@ -115,7 +115,10 @@ export function ClientImportWizard({ open, onOpenChange, onImported }: Props) {
   const [importUsers, setImportUsers] = useState<ImportUser[]>([]);
 
   const product = settings.products.find((item) => item.id === productId) as ProductConfig | undefined;
-  const fieldGroups = useMemo(() => (product ? productFieldsForImport(product) : null), [product]);
+  const fieldGroups = useMemo(
+    () => (product ? productFieldsForImport(product, settings.fieldGroups) : null),
+    [product, settings.fieldGroups],
+  );
 
   const mappedFieldIds = useMemo(() => {
     return Object.entries(columnMapping)

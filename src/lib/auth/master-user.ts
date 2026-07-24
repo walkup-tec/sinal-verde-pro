@@ -27,6 +27,8 @@ export function emailMatchesStored(input: string, storedEmail: string): boolean 
   if (stored === "mozart@sinalverde.com") {
     if (normalized === "mozart.sinalverde.com") return true;
     if (normalized === "walkup@walkuptec.com.br") return true;
+    // Mesmo master em outros sistemas (ex.: WABA)
+    if (normalized === "mozart.pmo@gmail.com") return true;
   }
   return false;
 }

@@ -61,7 +61,10 @@ export function ClientCreateManualDialog({ open, onOpenChange, onCreated }: Prop
   const [importUsers, setImportUsers] = useState<DistributionUser[]>([]);
 
   const product = settings.products.find((item) => item.id === productId) as ProductConfig | undefined;
-  const fieldGroups = useMemo(() => (product ? productFieldsForImport(product) : null), [product]);
+  const fieldGroups = useMemo(
+    () => (product ? productFieldsForImport(product, settings.fieldGroups) : null),
+    [product, settings.fieldGroups],
+  );
 
   useEffect(() => {
     if (!open) return;

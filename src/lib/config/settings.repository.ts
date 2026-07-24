@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { cloneDefaultFieldGroups } from "@/lib/config/client-fields";
 import { DEFAULT_SYSTEM_SETTINGS, normalizeSettings } from "@/lib/config/settings-defaults";
 import type {
   AttendanceStatusConfig,
@@ -9,6 +10,7 @@ import type {
   UserCategory,
 } from "@/lib/config/settings-types";
 import type { MenuItemId } from "@/lib/config/menu-items";
+import type { ClientFieldGroup } from "@/lib/config/client-fields";
 import type postgres from "postgres";
 import { getSql, isDatabaseEnabled } from "@/lib/db/postgres";
 
@@ -26,6 +28,16 @@ let cachedSettings: SystemSettings | null = null;
 
 type Tx = postgres.TransactionSql<Record<string, never>>;
 
+async function ensureFieldCatalogTable(sql: Awaited<ReturnType<typeof getSql>>): Promise<void> {
+  await sql`
+    create table if not exists crm.client_field_catalog (
+      id text primary key,
+      groups_json jsonb not null,
+      updated_at timestamptz not null default now()
+    )
+  `;
+}
+
 async function loadSystemSettingsFromPostgres(): Promise<SystemSettings> {
   const sql = await getSql();
   await sql`
@@ -41,8 +53,10 @@ async function loadSystemSettingsFromPostgres(): Promise<SystemSettings> {
     alter table crm.user_categories
     add column if not exists home_menu_id text not null default 'dashboard'
   `;
+  await ensureFieldCatalogTable(sql);
 
-  const [categories, menus, products, productFields, banks, attendanceStatuses] = await Promise.all([
+  const [categories, menus, products, productFields, banks, attendanceStatuses, fieldCatalog] =
+    await Promise.all([
     sql<{ id: string; name: string; home_menu_id: string | null }[]>`
       select id, name, home_menu_id from crm.user_categories order by name
     `,
@@ -64,6 +78,9 @@ async function loadSystemSettingsFromPostgres(): Promise<SystemSettings> {
       select id, label, color, auto_return_days, sort_order
       from crm.attendance_statuses
       order by sort_order, label
+    `,
+    sql<{ groups_json: ClientFieldGroup[] }[]>`
+      select groups_json from crm.client_field_catalog where id = 'default' limit 1
     `,
   ]);
 
@@ -105,7 +122,20 @@ async function loadSystemSettingsFromPostgres(): Promise<SystemSettings> {
       color: status.color ?? "#64748b",
       autoReturnDays: status.auto_return_days,
     })),
+    fieldGroups: Array.isArray(fieldCatalog[0]?.groups_json)
+      ? fieldCatalog[0].groups_json
+      : cloneDefaultFieldGroups(),
   } as SystemSettings);
+}
+
+async function syncFieldCatalog(tx: Tx, fieldGroups: ClientFieldGroup[]): Promise<void> {
+  await tx`
+    insert into crm.client_field_catalog (id, groups_json, updated_at)
+    values ('default', ${tx.json(fieldGroups)}, now())
+    on conflict (id) do update set
+      groups_json = excluded.groups_json,
+      updated_at = now()
+  `;
 }
 
 async function syncCategories(tx: Tx, categories: UserCategory[]): Promise<void> {
@@ -307,6 +337,8 @@ function mergeSettingsForSection(
       section === "all" || section === "attendanceStatuses"
         ? incoming.attendanceStatuses
         : base.attendanceStatuses,
+    fieldGroups:
+      section === "all" || section === "products" ? incoming.fieldGroups : base.fieldGroups,
   });
 }
 
@@ -325,6 +357,7 @@ async function saveSystemSettingsToPostgres(
     }
     if (section === "all" || section === "products") {
       await syncProducts(tx, next.products);
+      await syncFieldCatalog(tx, next.fieldGroups);
     }
     if (section === "all" || section === "banks") {
       await syncBanks(tx, next.banks);

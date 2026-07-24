@@ -1,4 +1,4 @@
-import type { ClientFieldId } from "@/lib/config/client-fields";
+import type { ClientFieldId, ClientFieldGroup } from "@/lib/config/client-fields";
 import type { MenuItemId } from "@/lib/config/menu-items";
 
 export type UserCategory = {
@@ -38,4 +38,6 @@ export type SystemSettings = {
   products: ProductConfig[];
   banks: BankConfig[];
   attendanceStatuses: AttendanceStatusConfig[];
+  /** Catálogo de seções/campos editável pelo master (Produtos). */
+  fieldGroups: ClientFieldGroup[];
 };

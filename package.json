@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
+    "dev:local": "vite dev --host 127.0.0.1 --port 8080 --strictPort",
     "build": "vite build",
     "build:node": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
+    "preview:local": "vite preview --host 127.0.0.1 --port 8080 --strictPort",
     "start": "node .output/server/index.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."

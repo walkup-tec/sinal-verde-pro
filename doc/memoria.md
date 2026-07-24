@@ -1,4 +1,14 @@
-﻿## 2026-07-22 — Campo financeiro Data do contrato
+﻿## 2026-07-24 — Login master no host local
+- Alias `mozart.pmo@gmail.com` → master Mozart; input login aceita legado sem @
+- Guia: `doc/AMBIENTE-HOST-LOCAL.md` (seção Login master)
+- Keywords: `login`, `master`, `localhost`, `mozart.pmo`
+
+## 2026-07-24 — Ambiente host local (teste no PC)
+- `npm run dev:local` → http://127.0.0.1:8080
+- Guia: `doc/AMBIENTE-HOST-LOCAL.md`
+- Keywords: `localhost`, `dev:local`, `host local`
+
+## 2026-07-22 — Campo financeiro Data do contrato
 - `data_contrato` em Dados financeiros + máscara dd/mm/aaaa
 - LOG: `doc/LOG-2026-07-22__153500__campo-data-do-contrato.md`
 - Keywords: `data_contrato`, `Data do contrato`, `financeiros`

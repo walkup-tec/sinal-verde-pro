@@ -1,4 +1,11 @@
-import { ALL_CLIENT_FIELD_IDS, LEGACY_CLIENT_FIELD_IDS, type ClientFieldId } from "@/lib/config/client-fields";
+import {
+  ALL_CLIENT_FIELD_IDS,
+  cloneDefaultFieldGroups,
+  fieldIdsFromGroups,
+  LEGACY_CLIENT_FIELD_IDS,
+  type ClientFieldGroup,
+  type ClientFieldId,
+} from "@/lib/config/client-fields";
 import { ALL_MENU_ITEM_IDS, type MenuItemId } from "@/lib/config/menu-items";
 import { resolveCategoryHomeMenuId } from "@/lib/config/category-utils";
 import type {
@@ -70,15 +77,21 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   ],
   banks: [],
   attendanceStatuses: [...DEFAULT_ATTENDANCE_STATUSES],
+  fieldGroups: cloneDefaultFieldGroups(),
 };
 
-export function createEmptyProduct(): import("@/lib/config/settings-types").ProductConfig {
-  return normalizeProductFields({
-    id: `prod-${crypto.randomUUID().slice(0, 8)}`,
-    name: "",
-    availableFieldIds: [...ALL_CLIENT_FIELD_IDS],
-    requiredFieldIds: [],
-  });
+export function createEmptyProduct(
+  catalogFieldIds: ClientFieldId[] = ALL_CLIENT_FIELD_IDS,
+): import("@/lib/config/settings-types").ProductConfig {
+  return normalizeProductFields(
+    {
+      id: `prod-${crypto.randomUUID().slice(0, 8)}`,
+      name: "",
+      availableFieldIds: [...catalogFieldIds],
+      requiredFieldIds: [],
+    },
+    catalogFieldIds,
+  );
 }
 
 export function createEmptyBank(): BankConfig {
@@ -130,10 +143,46 @@ export function ensureKanbanMenuForClientCategories(menuIds: MenuItemId[]): Menu
   return next;
 }
 
+export function normalizeFieldGroups(groups: ClientFieldGroup[] | undefined | null): ClientFieldGroup[] {
+  if (!Array.isArray(groups) || groups.length === 0) {
+    return cloneDefaultFieldGroups();
+  }
+
+  const seenGroupIds = new Set<string>();
+  const seenFieldIds = new Set<string>();
+  const normalized: ClientFieldGroup[] = [];
+
+  for (const group of groups) {
+    const id = String(group?.id ?? "").trim();
+    const title = String(group?.title ?? "").trim();
+    if (!id || !title || seenGroupIds.has(id)) continue;
+    seenGroupIds.add(id);
+
+    const fields = (Array.isArray(group.fields) ? group.fields : [])
+      .map((field) => ({
+        id: String(field?.id ?? "").trim(),
+        label: String(field?.label ?? "").trim(),
+        hint: field?.hint ? String(field.hint).trim() : undefined,
+      }))
+      .filter((field) => {
+        if (!field.id || !field.label) return false;
+        if (!/^[a-z][a-z0-9_]{0,63}$/.test(field.id)) return false;
+        if (seenFieldIds.has(field.id)) return false;
+        seenFieldIds.add(field.id);
+        return true;
+      });
+
+    // Mantém seção mesmo sem campos (master pode esvaziar e recriar).
+    normalized.push({ id, title, fields });
+  }
+
+  return normalized.length > 0 ? normalized : cloneDefaultFieldGroups();
+}
+
 /** Garante campos válidos (todos disponíveis por padrão, exceto os obrigatórios) e categorias válidas. */
 export function normalizeSettings(settings: SystemSettings & { defaultCategoryId?: string }): SystemSettings {
   const rawCategories =
-    settings.categories.length > 0
+    settings.categories?.length > 0
       ? settings.categories.map((c) => migrateCategory(c as unknown as Record<string, unknown>))
       : DEFAULT_SYSTEM_SETTINGS.categories;
 
@@ -149,11 +198,13 @@ export function normalizeSettings(settings: SystemSettings & { defaultCategoryId
     };
   });
 
-  const products = settings.products.map((p) => normalizeProductFields(p));
+  const fieldGroups = normalizeFieldGroups(settings.fieldGroups);
+  const catalogIds = fieldIdsFromGroups(fieldGroups);
+  const products = (settings.products ?? []).map((p) => normalizeProductFields(p, catalogIds));
   const banks = normalizeBanks(settings.banks ?? []);
   const attendanceStatuses = normalizeAttendanceStatuses(settings.attendanceStatuses ?? []);
 
-  return { categories, products, banks, attendanceStatuses };
+  return { categories, products, banks, attendanceStatuses, fieldGroups };
 }
 
 export function createEmptyAttendanceStatus(): AttendanceStatusConfig {
@@ -210,18 +261,19 @@ export function normalizeBanks(banks: BankConfig[]): BankConfig[] {
     });
 }
 
-function migrateClientFieldId(id: string): ClientFieldId | null {
-  if (ALL_CLIENT_FIELD_IDS.includes(id as ClientFieldId)) return id as ClientFieldId;
+function migrateClientFieldId(id: string, knownIds: Set<string>): ClientFieldId | null {
+  if (knownIds.has(id)) return id;
   const legacy = LEGACY_CLIENT_FIELD_IDS[id];
-  if (legacy === undefined) return null;
-  return legacy;
+  if (legacy === null) return null;
+  if (typeof legacy === "string" && knownIds.has(legacy)) return legacy;
+  return null;
 }
 
-function migrateFieldIdList(ids: string[]): ClientFieldId[] {
+function migrateFieldIdList(ids: string[], knownIds: Set<string>): ClientFieldId[] {
   const result: ClientFieldId[] = [];
   const seen = new Set<ClientFieldId>();
   for (const id of ids) {
-    const migrated = migrateClientFieldId(id);
+    const migrated = migrateClientFieldId(String(id), knownIds);
     if (!migrated || seen.has(migrated)) continue;
     seen.add(migrated);
     result.push(migrated);
@@ -231,9 +283,11 @@ function migrateFieldIdList(ids: string[]): ClientFieldId[] {
 
 export function normalizeProductFields(
   product: import("@/lib/config/settings-types").ProductConfig,
+  catalogFieldIds: ClientFieldId[] = ALL_CLIENT_FIELD_IDS,
 ): import("@/lib/config/settings-types").ProductConfig {
-  const requiredFieldIds = migrateFieldIdList(product.requiredFieldIds);
+  const known = new Set(catalogFieldIds);
+  const requiredFieldIds = migrateFieldIdList(product.requiredFieldIds, known);
   const requiredSet = new Set(requiredFieldIds);
-  const availableFieldIds = ALL_CLIENT_FIELD_IDS.filter((id) => !requiredSet.has(id));
+  const availableFieldIds = catalogFieldIds.filter((id) => !requiredSet.has(id));
   return { ...product, availableFieldIds, requiredFieldIds };
 }

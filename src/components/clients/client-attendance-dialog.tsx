@@ -36,7 +36,12 @@ import type {
   ClientRecord,
 } from "@/lib/clients/client.types";
 import { ClientAttachmentsPanel } from "@/components/clients/client-attachments-panel";
-import { CLIENT_FIELD_GROUPS, clientFieldLabel, type ClientFieldId } from "@/lib/config/client-fields";
+import {
+  CLIENT_FIELD_GROUPS,
+  clientFieldLabel,
+  type ClientFieldGroup,
+  type ClientFieldId,
+} from "@/lib/config/client-fields";
 
 type Props = {
   clientId: string | null;
@@ -70,22 +75,24 @@ function clientTitle(client: ClientRecord): string {
   return client.data.nome ?? client.data.cpf ?? client.data.telefone ?? client.id;
 }
 
-function indexedFieldGroups(client: ClientRecord) {
-  return CLIENT_FIELD_GROUPS.map((group) => ({
-    ...group,
-    fields: group.fields.filter((field) => {
-      if (CONTACT_FIELD_SET.has(field.id)) return false;
-      const value = client.data[field.id]?.trim();
-      return Boolean(value);
-    }),
-  })).filter((group) => group.fields.length > 0);
+function indexedFieldGroups(client: ClientRecord, groups: ClientFieldGroup[] = CLIENT_FIELD_GROUPS) {
+  return groups
+    .map((group) => ({
+      ...group,
+      fields: group.fields.filter((field) => {
+        if (CONTACT_FIELD_SET.has(field.id)) return false;
+        const value = client.data[field.id]?.trim();
+        return Boolean(value);
+      }),
+    }))
+    .filter((group) => group.fields.length > 0);
 }
 
-function mappedContacts(client: ClientRecord) {
+function mappedContacts(client: ClientRecord, groups: ClientFieldGroup[] = CLIENT_FIELD_GROUPS) {
   return CONTACT_FIELD_IDS.flatMap((fieldId) => {
     const value = client.data[fieldId]?.trim();
     if (!value) return [];
-    return [{ fieldId, label: clientFieldLabel(fieldId), value }];
+    return [{ fieldId, label: clientFieldLabel(fieldId, groups), value }];
   });
 }
 
@@ -157,8 +164,15 @@ export function ClientAttendanceDialog({
     };
   }, [open, clientId]);
 
-  const groups = useMemo(() => (client ? indexedFieldGroups(client) : []), [client]);
-  const contacts = useMemo(() => (client ? mappedContacts(client) : []), [client]);
+  const catalogGroups = settings.fieldGroups ?? CLIENT_FIELD_GROUPS;
+  const groups = useMemo(
+    () => (client ? indexedFieldGroups(client, catalogGroups) : []),
+    [client, catalogGroups],
+  );
+  const contacts = useMemo(
+    () => (client ? mappedContacts(client, catalogGroups) : []),
+    [client, catalogGroups],
+  );
 
   const statusOptions = useMemo(() => attendanceStatuses(settings), [settings]);
 
@@ -273,7 +287,7 @@ export function ClientAttendanceDialog({
                               className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5"
                             >
                               <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                                {clientFieldLabel(field.id)}
+                                {clientFieldLabel(field.id, catalogGroups)}
                               </dt>
                               <dd className="mt-1 text-sm font-medium break-words">
                                 {client.data[field.id]}

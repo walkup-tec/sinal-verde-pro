@@ -1,5 +1,4 @@
-import { clientFieldLabel } from "@/lib/config/client-fields";
-import type { ClientFieldId } from "@/lib/config/client-fields";
+import { clientFieldLabel, type ClientFieldGroup, type ClientFieldId } from "@/lib/config/client-fields";
 import type { ProductConfig } from "@/lib/config/settings-types";
 
 export type ProductFieldOption = {
@@ -8,14 +7,16 @@ export type ProductFieldOption = {
   required: boolean;
 };
 
-export function productFieldsForImport(product: ProductConfig): {
+export function productFieldsForImport(
+  product: ProductConfig,
+  fieldGroups?: ClientFieldGroup[],
+): {
   required: ProductFieldOption[];
   optional: ProductFieldOption[];
 } {
-  const requiredSet = new Set(product.requiredFieldIds);
   const toOption = (id: ClientFieldId, required: boolean): ProductFieldOption => ({
     id,
-    label: clientFieldLabel(id),
+    label: clientFieldLabel(id, fieldGroups),
     required,
   });
 
