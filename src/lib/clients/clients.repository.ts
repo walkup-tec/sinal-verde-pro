@@ -6,7 +6,7 @@ import { loadSystemSettingsFromDisk } from "@/lib/config/settings.repository";
 import { listAllUsers } from "@/lib/users/user.repository";
 import { clientFieldLabel } from "@/lib/config/client-fields";
 import { getClientActivityFlagsForClients } from "@/lib/clients/client-activity.repository";
-import { isConcludedAttendanceStatus } from "@/lib/clients/client-status";
+import { concludedAttendanceStatusIds, isConcludedAttendanceStatus } from "@/lib/clients/client-status";
 import type {
   AgendaAlertCounts,
   AgendaFilter,
@@ -872,9 +872,10 @@ function matchesAgendaListQuery(
   contactDate: string,
   status: string,
   query: Required<Pick<AgendaListQuery, "filter" | "pendingOnly">>,
+  settings: Awaited<ReturnType<typeof loadSystemSettingsFromDisk>>,
 ): boolean {
   if (!matchesAgendaFilter(contactDate, query.filter)) return false;
-  if (query.pendingOnly && isConcludedAttendanceStatus(status)) return false;
+  if (query.pendingOnly && isConcludedAttendanceStatus(status, settings)) return false;
   return true;
 }
 
@@ -884,6 +885,8 @@ async function listScheduledClientsFromPostgres(
   query: Required<Pick<AgendaListQuery, "filter" | "pendingOnly">>,
 ): Promise<ClientListItem[]> {
   const sql = await getSql();
+  const settings = await loadSystemSettingsFromDisk();
+  const concludedIds = concludedAttendanceStatusIds(settings);
   const today = localDateString();
   const tomorrow = localTomorrowString();
   const { filter, pendingOnly } = query;
@@ -897,7 +900,7 @@ async function listScheduledClientsFromPostgres(
           ? sql`sch.contact_date < ${today}::date`
           : sql`true`;
 
-  const statusClause = pendingOnly ? sql`c.status <> 'concluido'` : sql`true`;
+  const statusClause = pendingOnly ? sql`c.status not in ${sql(concludedIds)}` : sql`true`;
 
   const productIdsSelect = sql`
     (
@@ -949,6 +952,7 @@ async function listScheduledClientsFromDisk(
   query: Required<Pick<AgendaListQuery, "filter" | "pendingOnly">>,
 ): Promise<ClientListItem[]> {
   const clients = await listClientsForUser(userId, true);
+  const settings = await loadSystemSettingsFromDisk();
   const items: ClientListItem[] = [];
 
   for (const client of clients) {
@@ -961,7 +965,7 @@ async function listScheduledClientsFromDisk(
     ) {
       continue;
     }
-    if (!matchesAgendaListQuery(schedule.contactDate, client.status, query)) continue;
+    if (!matchesAgendaListQuery(schedule.contactDate, client.status, query, settings)) continue;
     items.push(mapClientListItem(client));
   }
 
@@ -1247,6 +1251,8 @@ async function getAgendaAlertCountsFromPostgres(
   isMaster: boolean,
 ): Promise<AgendaAlertCounts> {
   const sql = await getSql();
+  const settings = await loadSystemSettingsFromDisk();
+  const concludedIds = concludedAttendanceStatusIds(settings);
   const today = localDateString();
   const scopeClause = isMaster
     ? sql`true`
@@ -1263,7 +1269,7 @@ async function getAgendaAlertCountsFromPostgres(
     from crm.client_schedules sch
     inner join crm.clients c on c.id = sch.client_id
     where sch.contact_date = ${today}::date
-      and c.status <> 'concluido'
+      and c.status not in ${sql(concludedIds)}
       and ${scopeClause}
   `;
 
@@ -1272,7 +1278,7 @@ async function getAgendaAlertCountsFromPostgres(
     from crm.client_schedules sch
     inner join crm.clients c on c.id = sch.client_id
     where sch.contact_date < ${today}::date
-      and c.status <> 'concluido'
+      and c.status not in ${sql(concludedIds)}
       and ${scopeClause}
   `;
 
@@ -1287,12 +1293,13 @@ async function getAgendaAlertCountsFromDisk(
   isMaster: boolean,
 ): Promise<AgendaAlertCounts> {
   const clients = await listClientsForUser(userId, true);
+  const settings = await loadSystemSettingsFromDisk();
   let todayPending = 0;
   let overduePending = 0;
 
   for (const client of clients) {
     const schedule = await getClientSchedule(client.id);
-    if (!schedule || isConcludedAttendanceStatus(client.status)) continue;
+    if (!schedule || isConcludedAttendanceStatus(client.status, settings)) continue;
     if (
       !isMaster &&
       schedule.userId !== userId &&
@@ -1322,6 +1329,8 @@ async function getDashboardSummaryFromPostgres(
   isMaster: boolean,
 ): Promise<DashboardSummary> {
   const sql = await getSql();
+  const settings = await loadSystemSettingsFromDisk();
+  const concludedIds = concludedAttendanceStatusIds(settings);
   const today = localDateString();
   const assignmentJoin = isMaster
     ? sql``
@@ -1353,9 +1362,10 @@ async function getDashboardSummaryFromPostgres(
         where ((c.created_at at time zone 'America/Sao_Paulo')::date = ${today}::date)
       )::int as leads_today,
       count(*) filter (
-        where c.status not in ('concluido', 'perdido')
+        where c.status not in ${sql(concludedIds)}
+          and c.status <> 'perdido'
       )::int as open_leads,
-      count(*) filter (where c.status = 'concluido')::int as concluded,
+      count(*) filter (where c.status in ${sql(concludedIds)})::int as concluded,
       count(*) filter (where c.status = 'perdido')::int as lost
     from crm.clients c
     ${assignmentJoin}
@@ -1416,6 +1426,7 @@ async function getDashboardSummaryFromDisk(
   isMaster: boolean,
 ): Promise<DashboardSummary> {
   const today = localDateString();
+  const settings = await loadSystemSettingsFromDisk();
   const clients = await listClientsForUser(userId, isMaster);
   const withFlags = await enrichClientListItems(clients.map(mapClientListItem));
 
@@ -1428,7 +1439,7 @@ async function getDashboardSummaryFromDisk(
   for (const client of withFlags) {
     const day = createdAtToLocalDate(client.createdAt);
     if (day === today) leadsToday += 1;
-    if (client.status === "concluido") concluded += 1;
+    if (isConcludedAttendanceStatus(client.status, settings)) concluded += 1;
     else if (client.status === "perdido") lost += 1;
     else openLeads += 1;
     statusMap.set(client.status, (statusMap.get(client.status) ?? 0) + 1);

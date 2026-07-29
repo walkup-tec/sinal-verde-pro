@@ -96,7 +96,7 @@ function Dashboard() {
           value={formatCount(summary.openLeads)}
           icon={Clock}
           tone="warning"
-          hint="Exceto concluído/perdido"
+          hint="Exceto concluído/pago/perdido"
         />
         <KpiCard
           label="Concluídos"

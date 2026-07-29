@@ -47,7 +47,37 @@ export function isValidStatusOfKind(
   return statusesOfKind(settings, kind).some((status) => status.id === statusId);
 }
 
-/** Status que encerra o agendamento para alertas de agenda. */
-export function isConcludedAttendanceStatus(statusId: string): boolean {
-  return statusId === "concluido";
+function normalizeStatusLabel(label: string): string {
+  return label
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+}
+
+/**
+ * Status que encerram o atendimento positivamente (Concluído / Pago).
+ * Afeta dashboard "Em aberto"/"Concluídos" e agenda pendente.
+ */
+export function isConcludedAttendanceStatus(
+  statusId: string,
+  settings?: SystemSettings,
+): boolean {
+  if (!statusId) return false;
+  const id = statusId.trim().toLowerCase();
+  if (id === "concluido" || id === "pago") return true;
+  if (!settings) return false;
+  const found = attendanceStatuses(settings).find((status) => status.id === statusId);
+  if (!found) return false;
+  const label = normalizeStatusLabel(found.label);
+  return label === "concluido" || label === "pago";
+}
+
+/** IDs de status tratados como atendimento concluído (inclui "Pago" por rótulo). */
+export function concludedAttendanceStatusIds(settings: SystemSettings): string[] {
+  const ids = new Set<string>(["concluido", "pago"]);
+  for (const status of attendanceStatuses(settings)) {
+    if (isConcludedAttendanceStatus(status.id, settings)) ids.add(status.id);
+  }
+  return [...ids];
 }
