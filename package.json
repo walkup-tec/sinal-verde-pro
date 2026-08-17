@@ -13,7 +13,8 @@
     "preview:local": "vite preview --host 127.0.0.1 --port 8080 --strictPort",
     "start": "node .output/server/index.mjs",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "db:keepalive": "node scripts/supabase-keepalive.mjs"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",

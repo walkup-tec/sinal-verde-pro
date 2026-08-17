@@ -1,5 +1,6 @@
 import { DEFAULT_ATTENDANCE_STATUSES } from "@/lib/config/settings-defaults";
 import type { Sql } from "@/lib/db/postgres";
+import { ensureSupabaseKeepaliveTable } from "@/lib/db/ensure-supabase-keepalive";
 
 let ensured = false;
 
@@ -125,6 +126,7 @@ export async function ensureClientListIndexes(sql: Sql): Promise<void> {
 
   await ensureClientProductsTable(sql);
   await ensureAttendanceStatusColorColumn(sql);
+  await ensureSupabaseKeepaliveTable(sql);
 
   const [{ count }] = await sql<{ count: number }[]>`
     select count(*)::int as count from crm.attendance_statuses
