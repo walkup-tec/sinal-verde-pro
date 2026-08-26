@@ -57,11 +57,18 @@ export function ProductsSettings({ settings, onChange }: Props) {
 
   const productsRef = useRef(products);
   const fieldGroupsRef = useRef(fieldGroups);
+  const selectedIdRef = useRef(selectedId);
   const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+  const saveEpochRef = useRef(0);
+  const pendingSavesRef = useRef(0);
   productsRef.current = products;
   fieldGroupsRef.current = fieldGroups;
+  selectedIdRef.current = selectedId;
 
   useEffect(() => {
+    // Evita que a resposta de um save antigo (via settings do pai) apague
+    // obrigatoriedade marcada enquanto ainda há persistência em voo.
+    if (pendingSavesRef.current > 0) return;
     setProducts(settings.products);
     productsRef.current = settings.products;
     setFieldGroups(settings.fieldGroups);
@@ -85,15 +92,23 @@ export function ProductsSettings({ settings, onChange }: Props) {
     productsRef.current = nextProducts;
     setFieldGroups(nextFieldGroups);
     fieldGroupsRef.current = nextFieldGroups;
+    const epoch = ++saveEpochRef.current;
+    pendingSavesRef.current += 1;
     if (!options?.quiet) setSaving(true);
 
     const run = async () => {
+      // Snapshot no início da execução da fila — evita sobrescrever obrigatoriedade
+      // com um payload antigo capturado em onBlur/onChange stale.
+      const productsSnapshot = productsRef.current;
+      const fieldGroupsSnapshot = fieldGroupsRef.current;
       try {
         const saved = await onChange({
           ...settings,
-          products: productsRef.current,
-          fieldGroups: fieldGroupsRef.current,
+          products: productsSnapshot,
+          fieldGroups: fieldGroupsSnapshot,
         });
+        // Resposta antiga não deve apagar estado local mais novo.
+        if (epoch !== saveEpochRef.current) return;
         if (saved?.products) {
           setProducts(saved.products);
           productsRef.current = saved.products;
@@ -113,6 +128,7 @@ export function ProductsSettings({ settings, onChange }: Props) {
           toast.success(options?.successMessage ?? "Produtos salvos.");
         }
       } catch (error) {
+        if (epoch !== saveEpochRef.current) return;
         setProducts(settings.products);
         productsRef.current = settings.products;
         setFieldGroups(settings.fieldGroups);
@@ -120,7 +136,8 @@ export function ProductsSettings({ settings, onChange }: Props) {
         toast.error(error instanceof Error ? error.message : "Não foi possível salvar os produtos.");
         throw error;
       } finally {
-        if (!options?.quiet) setSaving(false);
+        pendingSavesRef.current = Math.max(0, pendingSavesRef.current - 1);
+        if (!options?.quiet && epoch === saveEpochRef.current) setSaving(false);
       }
     };
 
@@ -138,33 +155,44 @@ export function ProductsSettings({ settings, onChange }: Props) {
   };
 
   const updateSelected = (patch: Partial<ProductConfig>) => {
-    if (!selected) return;
-    const next = normalizeProductFields({ ...selected, ...patch }, catalogIds);
-    const nextProducts = products.map((product) => (product.id === selected.id ? next : product));
-    void persistState(nextProducts, fieldGroups, { quiet: true });
+    const currentProducts = productsRef.current;
+    const currentId = selectedIdRef.current;
+    const current =
+      currentProducts.find((product) => product.id === currentId) ?? currentProducts[0];
+    if (!current) return;
+    const next = normalizeProductFields({ ...current, ...patch }, catalogIds);
+    const nextProducts = currentProducts.map((product) =>
+      product.id === current.id ? next : product,
+    );
+    void persistState(nextProducts, fieldGroupsRef.current, { quiet: true });
   };
 
   const setFieldRequired = (fieldId: ClientFieldId, required: boolean) => {
-    if (!selected) return;
+    const currentProducts = productsRef.current;
+    const currentId = selectedIdRef.current;
+    const current =
+      currentProducts.find((product) => product.id === currentId) ?? currentProducts[0];
+    if (!current) return;
 
     const requiredFieldIds = required
-      ? [...new Set([...selected.requiredFieldIds, fieldId])]
-      : selected.requiredFieldIds.filter((id) => id !== fieldId);
+      ? [...new Set([...current.requiredFieldIds, fieldId])]
+      : current.requiredFieldIds.filter((id) => id !== fieldId);
 
     updateSelected({ requiredFieldIds });
   };
 
   const updateGroupTitle = (groupId: string, title: string) => {
     if (!isMaster) return;
-    const nextGroups = fieldGroups.map((group) =>
+    const nextGroups = fieldGroupsRef.current.map((group) =>
       group.id === groupId ? { ...group, title } : group,
     );
     setFieldGroups(nextGroups);
+    fieldGroupsRef.current = nextGroups;
   };
 
   const persistGroupTitle = () => {
     if (!isMaster) return;
-    void persistState(products, fieldGroups, { quiet: true });
+    void persistState(productsRef.current, fieldGroupsRef.current, { quiet: true });
   };
 
   const confirmAddField = () => {
@@ -176,12 +204,12 @@ export function ProductsSettings({ settings, onChange }: Props) {
     }
 
     const nextId = allocateUniqueFieldId(label, catalogIds);
-    const nextGroups = fieldGroups.map((group) =>
+    const nextGroups = fieldGroupsRef.current.map((group) =>
       group.id === addingFieldGroupId
         ? { ...group, fields: [...group.fields, { id: nextId, label }] }
         : group,
     );
-    const nextProducts = renormProducts(products, nextGroups);
+    const nextProducts = renormProducts(productsRef.current, nextGroups);
     setAddingFieldGroupId(null);
     setNewFieldLabel("");
     void persistState(nextProducts, nextGroups, { successMessage: "Campo adicionado." });
@@ -369,14 +397,16 @@ export function ProductsSettings({ settings, onChange }: Props) {
                 id="product-name"
                 value={selected.name}
                 onChange={(e) => {
-                  const nextProducts = products.map((product) =>
-                    product.id === selected.id ? { ...product, name: e.target.value } : product,
+                  const name = e.target.value;
+                  const currentId = selectedIdRef.current;
+                  const nextProducts = productsRef.current.map((product) =>
+                    product.id === currentId ? { ...product, name } : product,
                   );
                   setProducts(nextProducts);
+                  productsRef.current = nextProducts;
                 }}
                 onBlur={() => {
-                  if (!selected) return;
-                  void persistState(products, fieldGroups, { quiet: true });
+                  void persistState(productsRef.current, fieldGroupsRef.current, { quiet: true });
                 }}
                 placeholder="Ex.: Empréstimo CLT, FGTS, Cartão consignado"
               />
