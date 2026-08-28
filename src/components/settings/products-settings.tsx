@@ -137,7 +137,9 @@ export function ProductsSettings({ settings, onChange }: Props) {
         throw error;
       } finally {
         pendingSavesRef.current = Math.max(0, pendingSavesRef.current - 1);
-        if (!options?.quiet && epoch === saveEpochRef.current) setSaving(false);
+        if (pendingSavesRef.current === 0) {
+          setSaving(false);
+        }
       }
     };
 
