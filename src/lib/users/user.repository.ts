@@ -130,8 +130,30 @@ async function listUsersFromPostgres(): Promise<StoredUser[]> {
 }
 
 async function findUserByEmailFromPostgres(email: string): Promise<StoredUser | null> {
-  const users = await listUsersFromPostgres();
-  return users.find((user) => emailMatchesStored(email, user.email)) ?? null;
+  const normalized = normalizeEmail(email);
+  const sql = await getSql();
+  const rows = await sql<UserRow[]>`
+    select id, email, name, category_id, role, password_salt_b64, password_hash_b64, created_at
+    from crm.users
+    where lower(trim(email)) = ${normalized}
+    limit 1
+  `;
+  if (rows[0]) return mapUserRow(rows[0]);
+
+  const masterAliases = new Set([
+    "mozart.sinalverde.com",
+    "walkup@walkuptec.com.br",
+    "mozart.pmo@gmail.com",
+  ]);
+  if (!masterAliases.has(normalized)) return null;
+
+  const masterRows = await sql<UserRow[]>`
+    select id, email, name, category_id, role, password_salt_b64, password_hash_b64, created_at
+    from crm.users
+    where id = ${MASTER_USER_ID}
+    limit 1
+  `;
+  return masterRows[0] ? mapUserRow(masterRows[0]) : null;
 }
 
 async function findUserByIdFromPostgres(userId: string): Promise<StoredUser | null> {

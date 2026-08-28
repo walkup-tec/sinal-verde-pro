@@ -11,6 +11,7 @@ import { verifyPassword } from "@/lib/auth/password";
 import { sessionConfig, type SessionData } from "@/lib/auth/session-config";
 import { normalizeEmail } from "@/lib/auth/master-user";
 import { findUserByEmail, findUserById } from "@/lib/users/user.repository";
+import { resetSqlPool, withDbTimeout } from "@/lib/db/postgres";
 
 const ENRICH_TTL_MS = 10_000;
 
@@ -126,36 +127,47 @@ export const getAuthSessionFn = createServerFn({ method: "GET" }).handler(async 
 export const loginFn = createServerFn({ method: "POST" })
   .inputValidator(loginInputSchema)
   .handler(async ({ data }) => {
-    invalidateAuthEnrichCache();
-    const user = await findUserByEmail(data.email);
-    if (!user) {
-      throw new Error("E-mail ou senha incorretos.");
+    try {
+      return await withDbTimeout(performLogin(data), 20_000);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("excedeu")) {
+        await resetSqlPool();
+      }
+      throw error;
     }
-
-    const valid = await verifyPassword(data.password, user.passwordSaltB64, user.passwordHashB64);
-    if (!valid) {
-      throw new Error("E-mail ou senha incorretos.");
-    }
-
-    const { menuIds, homeMenuId } = await resolveSessionAccess(user.role, user.categoryId);
-    const sessionData = {
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      categoryId: user.categoryId,
-      menuIds,
-      homeMenuId,
-    } satisfies SessionData;
-
-    await updateSession(sessionConfig, sessionData);
-    enrichCache = {
-      userId: sessionData.userId,
-      expiresAt: Date.now() + ENRICH_TTL_MS,
-      data: sessionData,
-    };
-    return sessionData;
   });
+
+async function performLogin(data: { email: string; password: string }) {
+  invalidateAuthEnrichCache();
+  const user = await findUserByEmail(data.email);
+  if (!user) {
+    throw new Error("E-mail ou senha incorretos.");
+  }
+
+  const valid = await verifyPassword(data.password, user.passwordSaltB64, user.passwordHashB64);
+  if (!valid) {
+    throw new Error("E-mail ou senha incorretos.");
+  }
+
+  const { menuIds, homeMenuId } = await resolveSessionAccess(user.role, user.categoryId);
+  const sessionData = {
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    categoryId: user.categoryId,
+    menuIds,
+    homeMenuId,
+  } satisfies SessionData;
+
+  await updateSession(sessionConfig, sessionData);
+  enrichCache = {
+    userId: sessionData.userId,
+    expiresAt: Date.now() + ENRICH_TTL_MS,
+    data: sessionData,
+  };
+  return sessionData;
+}
 
 export const logoutFn = createServerFn({ method: "POST" }).handler(async () => {
   invalidateAuthEnrichCache();

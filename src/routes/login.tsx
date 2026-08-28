@@ -26,6 +26,30 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+const LOGIN_TIMEOUT_MS = 25_000;
+
+function withLoginTimeout<T>(promise: Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(
+        new Error(
+          "O servidor demorou para responder. Aguarde um instante e tente novamente. Se persistir, avise o suporte.",
+        ),
+      );
+    }, LOGIN_TIMEOUT_MS);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 function LoginPage() {
   const navigate = useNavigate();
   const login = useServerFn(loginFn);
@@ -99,7 +123,7 @@ function LoginPage() {
               const password = (form.elements.namedItem("senha") as HTMLInputElement).value;
 
               try {
-                const session = await login({ data: { email, password } });
+                const session = await withLoginTimeout(login({ data: { email, password } }));
                 await navigate({ to: firstAllowedAppPath(session) });
               } catch (err) {
                 setError(err instanceof Error ? err.message : "Não foi possível entrar.");

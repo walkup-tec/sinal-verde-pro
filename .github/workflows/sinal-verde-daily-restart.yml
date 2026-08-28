@@ -1,0 +1,58 @@
+# Restart preventivo do Sinal Verde — evita login travado em "Entrando…" após dias de uptime.
+# Mesmo comando documentado em doc/LOG-2026-07-29__165000__login-travado-restart-stop-first.md
+#
+# Secrets (GitHub → Settings → Secrets → Actions):
+#   VPS_SSH_PRIVATE_KEY  — obrigatório
+#   VPS_HOST             — opcional; default 72.60.51.127
+
+name: Sinal Verde daily restart
+
+on:
+  schedule:
+    # Todo dia 08:30 UTC (~5:30 BRT) — antes do horário comercial
+    - cron: "30 8 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: sinal-verde-daily-restart
+  cancel-in-progress: false
+
+jobs:
+  restart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Validar secrets
+        run: |
+          if [ -z "${{ secrets.VPS_SSH_PRIVATE_KEY }}" ]; then
+            echo "::error::VPS_SSH_PRIVATE_KEY ausente no repo sinal-verde-pro."
+            exit 1
+          fi
+
+      - name: SSH — restart Swarm stop-first
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST != '' && secrets.VPS_HOST || '72.60.51.127' }}
+          username: root
+          key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          port: 22
+          command_timeout: 8m
+          script: |
+            set -euo pipefail
+            echo "=== restart preventivo sinal-verde_acesso-sinalverde ==="
+            docker service update --force --update-order stop-first sinal-verde_acesso-sinalverde
+
+            ok=0
+            for i in 1 2 3 4 5 6; do
+              sleep 10
+              code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
+                --resolve acesso-sinalverde.com:443:127.0.0.1 \
+                https://acesso-sinalverde.com/api/health || echo 000)"
+              echo "health=${code} (tentativa ${i}/6)"
+              case "$code" in
+                200) ok=1; break ;;
+              esac
+            done
+
+            docker service ps sinal-verde_acesso-sinalverde --no-trunc | head -5 || true
+            test "$ok" = "1"

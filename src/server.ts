@@ -6,9 +6,16 @@ loadLocalEnvFile();
 import { handleClientAttachmentDownload } from "./lib/clients/client-attachment-download.handler";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
-import { warmDatabaseConnection } from "./lib/db/postgres";
+import {
+  getSql,
+  isDatabaseEnabled,
+  startDatabaseHeartbeat,
+  warmDatabaseConnection,
+  withDbTimeout,
+} from "./lib/db/postgres";
 
 warmDatabaseConnection();
+startDatabaseHeartbeat();
 
 /** 1 ano; includeSubDomains cobre www. Sem preload (não registrar no Chromium). */
 const HSTS_VALUE = "max-age=31536000; includeSubDomains";
@@ -105,9 +112,32 @@ async function normalizeCatastrophicSsrResponse(
   return brandedErrorResponse(request);
 }
 
+async function handleHealthCheck(): Promise<Response> {
+  if (!isDatabaseEnabled()) {
+    return new Response("ok", { status: 200, headers: { "content-type": "text/plain; charset=utf-8" } });
+  }
+
+  try {
+    const sql = await withDbTimeout(getSql(), 10_000);
+    await withDbTimeout(sql`select 1 as ok`, 8_000);
+    return new Response("ok", { status: 200, headers: { "content-type": "text/plain; charset=utf-8" } });
+  } catch (error) {
+    console.error("[health] database unavailable", error);
+    return new Response("db unavailable", {
+      status: 503,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
+  }
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const pathname = new URL(request.url).pathname;
+      if (pathname === "/api/health") {
+        return handleHealthCheck();
+      }
+
       const attachmentResponse = await handleClientAttachmentDownload(request);
       if (attachmentResponse) return withHsts(request, attachmentResponse);
 
