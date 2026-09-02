@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,9 @@ import { Logo } from "@/components/logo";
 import { ArrowRight, Sparkles, ShieldCheck, Zap } from "lucide-react";
 import { useState } from "react";
 import { firstAllowedAppPath } from "@/lib/auth/menu-access";
-import { getAuthSessionFn, loginFn } from "@/lib/auth/auth.server";
+import { getAuthSessionFn, loginFn, previewLoginMasterFn } from "@/lib/auth/auth.server";
+
+const SHOW_PREVIEW_MASTER = import.meta.env.DEV;
 
 export const Route = createFileRoute("/login")({
   beforeLoad: async () => {
@@ -53,7 +55,9 @@ function withLoginTimeout<T>(promise: Promise<T>): Promise<T> {
 function LoginPage() {
   const navigate = useNavigate();
   const login = useServerFn(loginFn);
+  const previewMaster = useServerFn(previewLoginMasterFn);
   const [loading, setLoading] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   return (
@@ -173,12 +177,44 @@ function LoginPage() {
             ) : null}
             <Button
               type="submit"
-              disabled={loading}
+              disabled={loading || previewLoading}
               className="w-full bg-accent text-accent-foreground hover:bg-accent/90 shadow-soft"
             >
               {loading ? "Entrando…" : "Entrar"} <ArrowRight className="size-4" />
             </Button>
           </form>
+
+          {SHOW_PREVIEW_MASTER ? (
+            <div className="mt-4 space-y-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={loading || previewLoading}
+                className="w-full"
+                onClick={() => {
+                  setError(null);
+                  setPreviewLoading(true);
+                  void previewMaster()
+                    .then(async (session) => {
+                      await navigate({ to: firstAllowedAppPath(session) });
+                    })
+                    .catch((err) => {
+                      setError(err instanceof Error ? err.message : "Não foi possível entrar no preview.");
+                    })
+                    .finally(() => setPreviewLoading(false));
+                }}
+              >
+                {previewLoading ? "Entrando como Mozart…" : "Entrar como Mozart (preview)"}
+              </Button>
+              <p className="text-center text-xs text-muted-foreground">
+                Ou abra{" "}
+                <Link to="/preview/master" className="font-medium text-primary underline-offset-2 hover:underline">
+                  /preview/master
+                </Link>{" "}
+                já autenticado.
+              </p>
+            </div>
+          ) : null}
 
           <div className="mt-6 text-center text-xs text-muted-foreground">
             Ao continuar você concorda com os Termos de Uso e Política de Privacidade.

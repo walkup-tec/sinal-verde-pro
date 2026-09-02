@@ -9,9 +9,9 @@ import {
 } from "@/lib/config/settings.repository";
 import { verifyPassword } from "@/lib/auth/password";
 import { sessionConfig, type SessionData } from "@/lib/auth/session-config";
-import { normalizeEmail } from "@/lib/auth/master-user";
+import { MASTER_USER, MASTER_USER_ID, normalizeEmail } from "@/lib/auth/master-user";
 import { findUserByEmail, findUserById } from "@/lib/users/user.repository";
-import { resetSqlPool, withDbTimeout } from "@/lib/db/postgres";
+import { isDatabaseEnabled, resetSqlPool, withDbTimeout } from "@/lib/db/postgres";
 
 const ENRICH_TTL_MS = 10_000;
 
@@ -173,4 +173,42 @@ export const logoutFn = createServerFn({ method: "POST" }).handler(async () => {
   invalidateAuthEnrichCache();
   await clearSession(sessionConfig);
   return { ok: true as const };
+});
+
+/**
+ * Atalho só do preview local/cloud (sem DATABASE_URL):
+ * entra direto como Mozart master, sem senha.
+ */
+export const previewLoginMasterFn = createServerFn({ method: "POST" }).handler(async () => {
+  if (isDatabaseEnabled()) {
+    throw new Error("Login rápido do preview só está disponível sem DATABASE_URL.");
+  }
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_PREVIEW_MASTER_LOGIN !== "1") {
+    throw new Error("Login rápido do preview desligado neste ambiente.");
+  }
+
+  invalidateAuthEnrichCache();
+  const user = (await findUserById(MASTER_USER_ID)) ?? (await findUserByEmail(MASTER_USER.email));
+  if (!user) {
+    throw new Error("Usuário master não encontrado neste preview.");
+  }
+
+  const { menuIds, homeMenuId } = await resolveSessionAccess(user.role, user.categoryId);
+  const sessionData = {
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    categoryId: user.categoryId,
+    menuIds,
+    homeMenuId,
+  } satisfies SessionData;
+
+  await updateSession(sessionConfig, sessionData);
+  enrichCache = {
+    userId: sessionData.userId,
+    expiresAt: Date.now() + ENRICH_TTL_MS,
+    data: sessionData,
+  };
+  return sessionData;
 });

@@ -9,21 +9,22 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/app'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/app/index'
-import { Route as AppUsuariosRouteImport } from './routes/app/usuarios'
-import { Route as AppRemarketingRouteImport } from './routes/app/remarketing'
-import { Route as AppKanbanRouteImport } from './routes/app/kanban'
-import { Route as AppConfiguracoesRouteImport } from './routes/app/configuracoes'
-import { Route as AppClientesRouteImport } from './routes/app/clientes'
 import { Route as AppAgendaRouteImport } from './routes/app/agenda'
+import { Route as AppClientesRouteImport } from './routes/app/clientes'
+import { Route as AppConfiguracoesRouteImport } from './routes/app/configuracoes'
+import { Route as AppKanbanRouteImport } from './routes/app/kanban'
+import { Route as AppRemarketingRouteImport } from './routes/app/remarketing'
+import { Route as AppUsuariosRouteImport } from './routes/app/usuarios'
+import { Route as PreviewMasterRouteImport } from './routes/preview.master'
 import { Route as AppClientesNovoRouteImport } from './routes/app/clientes.novo'
 
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -31,9 +32,9 @@ const AppRoute = AppRouteImport.update({
   path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
@@ -41,24 +42,9 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
-const AppUsuariosRoute = AppUsuariosRouteImport.update({
-  id: '/usuarios',
-  path: '/usuarios',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppRemarketingRoute = AppRemarketingRouteImport.update({
-  id: '/remarketing',
-  path: '/remarketing',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppKanbanRoute = AppKanbanRouteImport.update({
-  id: '/kanban',
-  path: '/kanban',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppConfiguracoesRoute = AppConfiguracoesRouteImport.update({
-  id: '/configuracoes',
-  path: '/configuracoes',
+const AppAgendaRoute = AppAgendaRouteImport.update({
+  id: '/agenda',
+  path: '/agenda',
   getParentRoute: () => AppRoute,
 } as any)
 const AppClientesRoute = AppClientesRouteImport.update({
@@ -66,10 +52,30 @@ const AppClientesRoute = AppClientesRouteImport.update({
   path: '/clientes',
   getParentRoute: () => AppRoute,
 } as any)
-const AppAgendaRoute = AppAgendaRouteImport.update({
-  id: '/agenda',
-  path: '/agenda',
+const AppConfiguracoesRoute = AppConfiguracoesRouteImport.update({
+  id: '/configuracoes',
+  path: '/configuracoes',
   getParentRoute: () => AppRoute,
+} as any)
+const AppKanbanRoute = AppKanbanRouteImport.update({
+  id: '/kanban',
+  path: '/kanban',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRemarketingRoute = AppRemarketingRouteImport.update({
+  id: '/remarketing',
+  path: '/remarketing',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppUsuariosRoute = AppUsuariosRouteImport.update({
+  id: '/usuarios',
+  path: '/usuarios',
+  getParentRoute: () => AppRoute,
+} as any)
+const PreviewMasterRoute = PreviewMasterRouteImport.update({
+  id: '/preview/master',
+  path: '/preview/master',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppClientesNovoRoute = AppClientesNovoRouteImport.update({
   id: '/novo',
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/app/kanban': typeof AppKanbanRoute
   '/app/remarketing': typeof AppRemarketingRoute
   '/app/usuarios': typeof AppUsuariosRoute
+  '/preview/master': typeof PreviewMasterRoute
   '/app/': typeof AppIndexRoute
   '/app/clientes/novo': typeof AppClientesNovoRoute
 }
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   '/app/kanban': typeof AppKanbanRoute
   '/app/remarketing': typeof AppRemarketingRoute
   '/app/usuarios': typeof AppUsuariosRoute
+  '/preview/master': typeof PreviewMasterRoute
   '/app': typeof AppIndexRoute
   '/app/clientes/novo': typeof AppClientesNovoRoute
 }
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/app/kanban': typeof AppKanbanRoute
   '/app/remarketing': typeof AppRemarketingRoute
   '/app/usuarios': typeof AppUsuariosRoute
+  '/preview/master': typeof PreviewMasterRoute
   '/app/': typeof AppIndexRoute
   '/app/clientes/novo': typeof AppClientesNovoRoute
 }
@@ -128,6 +137,7 @@ export interface FileRouteTypes {
     | '/app/kanban'
     | '/app/remarketing'
     | '/app/usuarios'
+    | '/preview/master'
     | '/app/'
     | '/app/clientes/novo'
   fileRoutesByTo: FileRoutesByTo
@@ -140,6 +150,7 @@ export interface FileRouteTypes {
     | '/app/kanban'
     | '/app/remarketing'
     | '/app/usuarios'
+    | '/preview/master'
     | '/app'
     | '/app/clientes/novo'
   id:
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | '/app/kanban'
     | '/app/remarketing'
     | '/app/usuarios'
+    | '/preview/master'
     | '/app/'
     | '/app/clientes/novo'
   fileRoutesById: FileRoutesById
@@ -161,15 +173,16 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  PreviewMasterRoute: typeof PreviewMasterRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app': {
@@ -179,11 +192,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/': {
@@ -193,32 +206,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/app/usuarios': {
-      id: '/app/usuarios'
-      path: '/usuarios'
-      fullPath: '/app/usuarios'
-      preLoaderRoute: typeof AppUsuariosRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/remarketing': {
-      id: '/app/remarketing'
-      path: '/remarketing'
-      fullPath: '/app/remarketing'
-      preLoaderRoute: typeof AppRemarketingRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/kanban': {
-      id: '/app/kanban'
-      path: '/kanban'
-      fullPath: '/app/kanban'
-      preLoaderRoute: typeof AppKanbanRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/configuracoes': {
-      id: '/app/configuracoes'
-      path: '/configuracoes'
-      fullPath: '/app/configuracoes'
-      preLoaderRoute: typeof AppConfiguracoesRouteImport
+    '/app/agenda': {
+      id: '/app/agenda'
+      path: '/agenda'
+      fullPath: '/app/agenda'
+      preLoaderRoute: typeof AppAgendaRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/clientes': {
@@ -228,12 +220,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientesRouteImport
       parentRoute: typeof AppRoute
     }
-    '/app/agenda': {
-      id: '/app/agenda'
-      path: '/agenda'
-      fullPath: '/app/agenda'
-      preLoaderRoute: typeof AppAgendaRouteImport
+    '/app/configuracoes': {
+      id: '/app/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/app/configuracoes'
+      preLoaderRoute: typeof AppConfiguracoesRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/app/kanban': {
+      id: '/app/kanban'
+      path: '/kanban'
+      fullPath: '/app/kanban'
+      preLoaderRoute: typeof AppKanbanRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/remarketing': {
+      id: '/app/remarketing'
+      path: '/remarketing'
+      fullPath: '/app/remarketing'
+      preLoaderRoute: typeof AppRemarketingRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/usuarios': {
+      id: '/app/usuarios'
+      path: '/usuarios'
+      fullPath: '/app/usuarios'
+      preLoaderRoute: typeof AppUsuariosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/preview/master': {
+      id: '/preview/master'
+      path: '/preview/master'
+      fullPath: '/preview/master'
+      preLoaderRoute: typeof PreviewMasterRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/app/clientes/novo': {
       id: '/app/clientes/novo'
@@ -283,6 +303,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  PreviewMasterRoute: PreviewMasterRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
