@@ -33,7 +33,7 @@ MAIL_MODE=off
 ## Subir
 
 ```bash
-cd D:\CRM-SinalVerde
+cd E:\01A-Drax-Servidor\CRM-SinalVerde
 npm run dev:local
 ```
 
