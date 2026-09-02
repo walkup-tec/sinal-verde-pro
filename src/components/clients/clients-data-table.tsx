@@ -11,17 +11,24 @@ import { ClientRowActions } from "@/components/clients/client-row-actions";
 import { StatusBadge } from "@/components/clients/status-badge";
 import type { ClientActionKind } from "@/components/clients/client-action-modals";
 import type { ClientListItem } from "@/lib/clients/client.types";
-import { formatLocalDateLabel } from "@/lib/dates/local-date";
+import { createdAtToLocalDate, formatLocalDateLabel } from "@/lib/dates/local-date";
 import { formatCurrencyBrlDisplay } from "@/lib/masks/br-currency";
 
+type ScheduleRowItem = ClientListItem & {
+  contactDate?: string;
+  scheduleCreatedAt?: string;
+};
+
 type Props = {
-  items: Array<ClientListItem & { contactDate?: string }>;
+  items: ScheduleRowItem[];
   productName: (productId: string) => string;
   statusLabel: (statusId: string, snapshotLabel?: string) => string;
   statusColor?: (statusId: string) => string;
   onAction: (client: ClientListItem, action: ClientActionKind) => void;
   dimmed?: boolean;
-  /** Exibe coluna com a data de contato da agenda (Remarketing). */
+  /**
+   * Remarketing: mostra Agendamento (data do contato) e Criação (quando o agendamento foi feito).
+   */
   showContactDate?: boolean;
   /** Quando omitido (ex.: Agenda), a coluna de seleção fica ocultada. */
   selectedIds?: Set<string>;
@@ -37,6 +44,12 @@ function primaryValue(client: ClientListItem) {
 function productsLabel(client: ClientListItem, productName: (productId: string) => string) {
   const ids = client.productIds?.length ? client.productIds : [client.productId];
   return ids.map((id) => productName(id)).join(", ");
+}
+
+function scheduleCreatedLabel(value?: string): string {
+  if (!value) return "—";
+  const day = createdAtToLocalDate(value) ?? value.slice(0, 10);
+  return day ? formatLocalDateLabel(day) : "—";
 }
 
 export function ClientsDataTable({
@@ -76,7 +89,12 @@ export function ClientsDataTable({
               </TableHead>
             ) : null}
             <TableHead>Cliente</TableHead>
-            {showContactDate ? <TableHead>Agenda</TableHead> : null}
+            {showContactDate ? (
+              <>
+                <TableHead>Agendamento</TableHead>
+                <TableHead>Criação</TableHead>
+              </>
+            ) : null}
             <TableHead>Produto</TableHead>
             <TableHead>Valor liberado</TableHead>
             <TableHead>Status</TableHead>
@@ -100,9 +118,14 @@ export function ClientsDataTable({
                 ) : null}
                 <TableCell className="font-medium">{primaryValue(client)}</TableCell>
                 {showContactDate ? (
-                  <TableCell className="text-muted-foreground">
-                    {client.contactDate ? formatLocalDateLabel(client.contactDate) : "—"}
-                  </TableCell>
+                  <>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {client.contactDate ? formatLocalDateLabel(client.contactDate) : "—"}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {scheduleCreatedLabel(client.scheduleCreatedAt)}
+                    </TableCell>
+                  </>
                 ) : null}
                 <TableCell>{productsLabel(client, productName)}</TableCell>
                 <TableCell className="tabular-nums whitespace-nowrap">

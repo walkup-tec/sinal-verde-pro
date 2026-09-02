@@ -160,7 +160,10 @@ export type RemarketingListQuery = {
 };
 
 export type RemarketingListItem = ClientListItem & {
+  /** Data para a qual o contato foi agendado (YYYY-MM-DD). */
   contactDate: string;
+  /** Quando o agendamento foi criado (ISO). */
+  scheduleCreatedAt: string;
 };
 
 /** Modos do quadro Kanban. */

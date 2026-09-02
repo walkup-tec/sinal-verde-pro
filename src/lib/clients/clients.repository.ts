@@ -1041,6 +1041,7 @@ function normalizeRemarketingFilter(filter?: RemarketingFilter): RemarketingFilt
 
 type RemarketingListRow = ClientListRow & {
   contact_date: string | Date;
+  schedule_created_at: Date | string;
 };
 
 function mapRemarketingListRow(row: RemarketingListRow): RemarketingListItem {
@@ -1048,9 +1049,14 @@ function mapRemarketingListRow(row: RemarketingListRow): RemarketingListItem {
     typeof row.contact_date === "string"
       ? row.contact_date.slice(0, 10)
       : localDateString(row.contact_date);
+  const scheduleCreatedAt =
+    row.schedule_created_at instanceof Date
+      ? row.schedule_created_at.toISOString()
+      : String(row.schedule_created_at ?? "");
   return {
     ...mapClientListRow(row),
     contactDate,
+    scheduleCreatedAt,
   };
 }
 
@@ -1100,6 +1106,7 @@ async function listRemarketingClientsFromPostgres(
       c.display,
       c.created_at,
       sch.contact_date,
+      sch.created_at as schedule_created_at,
       ${sql.unsafe(CLIENT_LIST_ACTIVITY_COLUMNS)}
     from crm.client_schedules sch
     inner join crm.clients c on c.id = sch.client_id
@@ -1133,16 +1140,26 @@ async function listRemarketingClientsFromDisk(
     items.push({
       ...mapClientListItem(client),
       contactDate: schedule.contactDate,
+      scheduleCreatedAt: schedule.createdAt,
     });
   }
 
-  const contactById = new Map(items.map((item) => [item.id, item.contactDate]));
+  const scheduleMetaById = new Map(
+    items.map((item) => [
+      item.id,
+      { contactDate: item.contactDate, scheduleCreatedAt: item.scheduleCreatedAt },
+    ]),
+  );
   const enriched = await enrichClientListItems(items);
   return enriched
-    .map((item) => ({
-      ...item,
-      contactDate: contactById.get(item.id) ?? "",
-    }))
+    .map((item) => {
+      const meta = scheduleMetaById.get(item.id);
+      return {
+        ...item,
+        contactDate: meta?.contactDate ?? "",
+        scheduleCreatedAt: meta?.scheduleCreatedAt ?? "",
+      };
+    })
     .filter((item) => item.contactDate)
     .sort((left, right) => {
       const byDate = left.contactDate.localeCompare(right.contactDate);

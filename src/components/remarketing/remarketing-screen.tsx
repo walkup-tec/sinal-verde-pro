@@ -115,6 +115,7 @@ export function RemarketingScreen({ initialFilter, initialItems }: Props) {
     const row = items.find((item) => item.id === client.id) ?? {
       ...client,
       contactDate: "",
+      scheduleCreatedAt: "",
     };
     setActionClient(row);
     setActionKind(action);
