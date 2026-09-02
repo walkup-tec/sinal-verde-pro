@@ -13,7 +13,7 @@ export const Route = createFileRoute("/app/configuracoes")({
 });
 
 function ConfiguracoesPage() {
-  const { settings, setSettings } = useSystemSettings();
+  const { settings, setSettings, ready } = useSystemSettings();
 
   return (
     <div className="space-y-6">
@@ -78,6 +78,7 @@ function ConfiguracoesPage() {
         <TabsContent value="status-atendimento">
           <AttendanceStatusesSettings
             settings={settings}
+            ready={ready}
             onChange={(next) => setSettings(next, "attendanceStatuses")}
           />
         </TabsContent>

@@ -311,9 +311,11 @@ export async function bulkUpdateClientStatus(input: {
   actorUserId: string;
   isMaster: boolean;
   status: string;
+  statusLabel?: string;
 }): Promise<{ affected: number; clientIds: string[] }> {
   const status = input.status.trim();
   if (!status) throw new Error("Status inválido.");
+  const label = input.statusLabel?.trim() ?? "";
 
   const clientIds = await resolveClientIdsFromScope(input.scope, input.actorUserId, input.isMaster);
   if (!isDatabaseEnabled()) {
@@ -321,9 +323,13 @@ export async function bulkUpdateClientStatus(input: {
   }
 
   const sql = await getSql();
+  await sql`
+    alter table crm.clients
+    add column if not exists status_label text not null default ''
+  `;
   const updated = await sql<{ id: string }[]>`
     update crm.clients
-    set status = ${status}
+    set status = ${status}, status_label = ${label}
     where id in ${sql(clientIds)}
     returning id
   `;

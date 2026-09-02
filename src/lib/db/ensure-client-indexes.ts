@@ -28,6 +28,10 @@ async function ensureAttendanceStatusColorColumn(sql: Sql): Promise<void> {
     alter table crm.attendance_statuses
     add column if not exists auto_return_days int null
   `;
+  await sql`
+    alter table crm.attendance_statuses
+    add column if not exists archived_at timestamptz null
+  `;
   for (const status of DEFAULT_ATTENDANCE_STATUSES) {
     await sql`
       update crm.attendance_statuses
@@ -36,6 +40,17 @@ async function ensureAttendanceStatusColorColumn(sql: Sql): Promise<void> {
         and (color is null or color = '' or color = '#64748b')
     `;
   }
+}
+
+async function ensureClientStatusLabelColumns(sql: Sql): Promise<void> {
+  await sql`
+    alter table crm.clients
+    add column if not exists status_label text not null default ''
+  `;
+  await sql`
+    alter table crm.clients
+    add column if not exists contract_status_label text not null default ''
+  `;
 }
 
 /** Provisiona schema auxiliar uma vez por processo — evita DDL em toda ação. */
@@ -55,6 +70,7 @@ export async function ensureClientListIndexes(sql: Sql): Promise<void> {
   if (ready) {
     await ensureClientProductsTable(sql);
     await ensureAttendanceStatusColorColumn(sql);
+    await ensureClientStatusLabelColumns(sql);
     ensured = true;
     return;
   }
@@ -126,6 +142,7 @@ export async function ensureClientListIndexes(sql: Sql): Promise<void> {
 
   await ensureClientProductsTable(sql);
   await ensureAttendanceStatusColorColumn(sql);
+  await ensureClientStatusLabelColumns(sql);
   await ensureSupabaseKeepaliveTable(sql);
 
   const [{ count }] = await sql<{ count: number }[]>`

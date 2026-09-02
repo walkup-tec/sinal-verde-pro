@@ -62,6 +62,8 @@ type ClientRow = {
   import_batch_id: string | null;
   status: string;
   contract_status: string | null;
+  status_label: string | null;
+  contract_status_label: string | null;
   data: Record<string, string>;
   distribution: LeadDistribution;
   display: ClientRecord["display"];
@@ -185,6 +187,7 @@ function mapClientListItem(record: ClientRecord): ClientListItem {
     productId: record.productId,
     productIds: [record.productId],
     status: record.status,
+    statusLabel: record.statusLabel ?? "",
     nome: record.data.nome ?? null,
     cpf: record.data.cpf ?? null,
     telefone: record.data.telefone ?? null,
@@ -207,7 +210,9 @@ function mapClientRow(row: ClientRow): ClientRecord {
     distribution: row.distribution,
     display: row.display,
     status: row.status || "novo",
+    statusLabel: row.status_label ?? "",
     contractStatus: row.contract_status ?? "",
+    contractStatusLabel: row.contract_status_label ?? "",
     createdAt: row.created_at.toISOString(),
   };
 }
@@ -217,6 +222,7 @@ type ClientListRow = {
   product_id: string;
   product_ids: string[] | null;
   status: string;
+  status_label: string | null;
   nome: string | null;
   cpf: string | null;
   telefone: string | null;
@@ -236,6 +242,7 @@ function mapClientListRow(row: ClientListRow): ClientListItem {
     productId: row.product_id,
     productIds: productIds.length > 0 ? productIds : [row.product_id],
     status: row.status,
+    statusLabel: row.status_label ?? "",
     nome: row.nome,
     cpf: row.cpf,
     telefone: row.telefone,
@@ -348,6 +355,7 @@ async function listClientsPageFromPostgres(
   query: NormalizedClientsPageQuery,
 ): Promise<ClientsPageResult> {
   const sql = await getSql();
+  await ensureClientContractStatusColumn(sql);
   const searchPattern = query.search ? `%${query.search}%` : null;
 
   const assignmentJoin = isMaster
@@ -381,6 +389,7 @@ async function listClientsPageFromPostgres(
         ) products
       ) as product_ids,
       c.status,
+      c.status_label,
       c.data->>'nome' as nome,
       c.data->>'cpf' as cpf,
       c.data->>'telefone' as telefone,
@@ -486,7 +495,9 @@ async function listClientsFromPostgres(userId: string, isMaster: boolean): Promi
           c.product_id,
           c.import_batch_id,
           c.status,
+          c.status_label,
           c.contract_status,
+          c.contract_status_label,
           c.data,
           c.distribution,
           c.display,
@@ -503,7 +514,9 @@ async function listClientsFromPostgres(userId: string, isMaster: boolean): Promi
           c.product_id,
           c.import_batch_id,
           c.status,
+          c.status_label,
           c.contract_status,
+          c.contract_status_label,
           c.data,
           c.distribution,
           c.display,
@@ -523,6 +536,14 @@ async function ensureClientContractStatusColumn(sql: Awaited<ReturnType<typeof g
   await sql`
     alter table crm.clients
     add column if not exists contract_status text not null default ''
+  `;
+  await sql`
+    alter table crm.clients
+    add column if not exists status_label text not null default ''
+  `;
+  await sql`
+    alter table crm.clients
+    add column if not exists contract_status_label text not null default ''
   `;
 }
 
@@ -783,7 +804,9 @@ async function getClientFromPostgres(
           c.product_id,
           c.import_batch_id,
           c.status,
+          c.status_label,
           c.contract_status,
+          c.contract_status_label,
           c.data,
           c.distribution,
           c.display,
@@ -801,7 +824,9 @@ async function getClientFromPostgres(
           c.product_id,
           c.import_batch_id,
           c.status,
+          c.status_label,
           c.contract_status,
+          c.contract_status_label,
           c.data,
           c.distribution,
           c.display,
@@ -885,6 +910,7 @@ async function listScheduledClientsFromPostgres(
   query: Required<Pick<AgendaListQuery, "filter" | "pendingOnly">>,
 ): Promise<ClientListItem[]> {
   const sql = await getSql();
+  await ensureClientContractStatusColumn(sql);
   const settings = await loadSystemSettingsFromDisk();
   const concludedIds = concludedAttendanceStatusIds(settings);
   const today = localDateString();
@@ -929,6 +955,7 @@ async function listScheduledClientsFromPostgres(
       c.product_id,
       ${productIdsSelect},
       c.status,
+      c.status_label,
       c.data->>'nome' as nome,
       c.data->>'cpf' as cpf,
       c.data->>'telefone' as telefone,
@@ -1033,6 +1060,7 @@ async function listRemarketingClientsFromPostgres(
   filter: RemarketingFilter,
 ): Promise<RemarketingListItem[]> {
   const sql = await getSql();
+  await ensureClientContractStatusColumn(sql);
   const { from, to } = resolveRemarketingDateRange(filter);
   const dateClause = sql`sch.contact_date >= ${from}::date and sch.contact_date <= ${to}::date`;
 
@@ -1063,6 +1091,7 @@ async function listRemarketingClientsFromPostgres(
       c.product_id,
       ${productIdsSelect},
       c.status,
+      c.status_label,
       c.data->>'nome' as nome,
       c.data->>'cpf' as cpf,
       c.data->>'telefone' as telefone,
@@ -1160,6 +1189,7 @@ async function listKanbanClientsFromPostgres(
   isMaster: boolean,
 ): Promise<KanbanListItem[]> {
   const sql = await getSql();
+  await ensureClientContractStatusColumn(sql);
   const productIdsSelect = sql`
     (
       select coalesce(array_agg(distinct pid), array[c.product_id])
@@ -1181,6 +1211,7 @@ async function listKanbanClientsFromPostgres(
       c.product_id,
       ${productIdsSelect},
       c.status,
+      c.status_label,
       c.data->>'nome' as nome,
       c.data->>'cpf' as cpf,
       c.data->>'telefone' as telefone,
@@ -1329,6 +1360,7 @@ async function getDashboardSummaryFromPostgres(
   isMaster: boolean,
 ): Promise<DashboardSummary> {
   const sql = await getSql();
+  await ensureClientContractStatusColumn(sql);
   const settings = await loadSystemSettingsFromDisk();
   const concludedIds = concludedAttendanceStatusIds(settings);
   const today = localDateString();
@@ -1385,6 +1417,7 @@ async function getDashboardSummaryFromPostgres(
       c.product_id,
       ${productIdsSelect},
       c.status,
+      c.status_label,
       c.data->>'nome' as nome,
       c.data->>'cpf' as cpf,
       c.data->>'telefone' as telefone,
@@ -1488,9 +1521,11 @@ export async function updateClientStatus(
   isMaster: boolean,
   status: string,
   field: "status" | "contractStatus" = "status",
+  statusLabel = "",
 ): Promise<ClientRecord> {
   const trimmed = status.trim();
   if (!trimmed) throw new Error("Status inválido.");
+  const label = statusLabel.trim();
 
   const client = await getClientByIdForUser(clientId, userId, isMaster);
   if (!client) throw new Error("Cliente não encontrado.");
@@ -1501,29 +1536,29 @@ export async function updateClientStatus(
     if (field === "contractStatus") {
       await sql`
         update crm.clients
-        set contract_status = ${trimmed}
+        set contract_status = ${trimmed}, contract_status_label = ${label}
         where id = ${clientId}
       `;
-      return { ...client, contractStatus: trimmed };
+      return { ...client, contractStatus: trimmed, contractStatusLabel: label };
     }
     await sql`
       update crm.clients
-      set status = ${trimmed}
+      set status = ${trimmed}, status_label = ${label}
       where id = ${clientId}
     `;
-    return { ...client, status: trimmed };
+    return { ...client, status: trimmed, statusLabel: label };
   }
 
   const clients = await readClientsFromDisk();
   const next = clients.map((item) =>
     item.id === clientId
       ? field === "contractStatus"
-        ? { ...item, contractStatus: trimmed }
-        : { ...item, status: trimmed }
+        ? { ...item, contractStatus: trimmed, contractStatusLabel: label }
+        : { ...item, status: trimmed, statusLabel: label }
       : item,
   );
   await writeClientsToDisk(next);
   return field === "contractStatus"
-    ? { ...client, contractStatus: trimmed }
-    : { ...client, status: trimmed };
+    ? { ...client, contractStatus: trimmed, contractStatusLabel: label }
+    : { ...client, status: trimmed, statusLabel: label };
 }

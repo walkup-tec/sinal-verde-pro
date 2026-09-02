@@ -86,7 +86,8 @@ export function AgendaScreen({ initialFilter, initialPendingOnly, initialItems }
   const productName = (productId: string) =>
     settings.products.find((product) => product.id === productId)?.name ?? productId;
 
-  const statusLabel = (statusId: string) => resolveAttendanceStatusLabel(statusId, settings);
+  const statusLabel = (statusId: string, snapshotLabel?: string) =>
+    resolveAttendanceStatusLabel(statusId, settings, snapshotLabel);
   const statusColor = (statusId: string) => resolveAttendanceStatusColor(statusId, settings);
 
   const openAction = (client: ClientListItem, action: ClientActionKind) => {

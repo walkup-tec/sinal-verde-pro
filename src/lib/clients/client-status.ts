@@ -4,10 +4,16 @@ import { DEFAULT_STATUS_COLOR, normalizeStatusColor } from "@/lib/config/status-
 
 export type { StatusKind };
 
-export function attendanceStatuses(settings: SystemSettings) {
+/** Catálogo completo, inclusive status arquivados após exclusão. */
+export function allAttendanceStatuses(settings: SystemSettings) {
   return settings.attendanceStatuses.length > 0
     ? settings.attendanceStatuses
     : DEFAULT_ATTENDANCE_STATUSES;
+}
+
+/** Status ativos para filtros, selects e Configurações. */
+export function attendanceStatuses(settings: SystemSettings) {
+  return allAttendanceStatuses(settings).filter((status) => !status.archived);
 }
 
 export function statusesOfKind(settings: SystemSettings, kind: StatusKind) {
@@ -20,16 +26,37 @@ export function attendanceKindStatuses(settings: SystemSettings) {
   return ofKind.length > 0 ? ofKind : DEFAULT_ATTENDANCE_STATUSES;
 }
 
-export function resolveAttendanceStatusLabel(statusId: string, settings: SystemSettings): string {
+export function isGeneratedStatusId(value: string): boolean {
+  return /^status-[0-9a-f]{6,}$/i.test(value.trim());
+}
+
+/** Extrai o nome gravado no histórico quando o status já saiu do catálogo ativo. */
+export function extractStatusLabelFromNote(note: string): string | null {
+  const match = note.match(
+    /(?:alterado para|definido como|em lote para):\s*([^\n]+?)(?:\s*\(antes:|\s+Retorno|$)/i,
+  );
+  const label = match?.[1]?.trim().replace(/[.\s]+$/, "");
+  if (!label || isGeneratedStatusId(label)) return null;
+  return label;
+}
+
+export function resolveAttendanceStatusLabel(
+  statusId: string,
+  settings: SystemSettings,
+  snapshotLabel?: string | null,
+): string {
   if (!statusId) return "—";
-  const found = attendanceStatuses(settings).find((status) => status.id === statusId);
-  if (found) return found.label;
+  const found = allAttendanceStatuses(settings).find((status) => status.id === statusId);
+  if (found?.label) return found.label;
+  const snapshot = snapshotLabel?.trim();
+  if (snapshot && !isGeneratedStatusId(snapshot)) return snapshot;
   if (statusId === "novo") return "Novo";
+  if (isGeneratedStatusId(statusId)) return snapshot || "Status removido";
   return statusId;
 }
 
 export function resolveAttendanceStatusColor(statusId: string, settings: SystemSettings): string {
-  const found = attendanceStatuses(settings).find((status) => status.id === statusId);
+  const found = allAttendanceStatuses(settings).find((status) => status.id === statusId);
   if (found?.color) return normalizeStatusColor(found.color);
   const fallback = DEFAULT_ATTENDANCE_STATUSES.find((status) => status.id === statusId);
   return normalizeStatusColor(fallback?.color, DEFAULT_STATUS_COLOR);
@@ -67,7 +94,7 @@ export function isConcludedAttendanceStatus(
   const id = statusId.trim().toLowerCase();
   if (id === "concluido" || id === "pago") return true;
   if (!settings) return false;
-  const found = attendanceStatuses(settings).find((status) => status.id === statusId);
+  const found = allAttendanceStatuses(settings).find((status) => status.id === statusId);
   if (!found) return false;
   const label = normalizeStatusLabel(found.label);
   return label === "concluido" || label === "pago";
@@ -76,7 +103,7 @@ export function isConcludedAttendanceStatus(
 /** IDs de status tratados como atendimento concluído (inclui "Pago" por rótulo). */
 export function concludedAttendanceStatusIds(settings: SystemSettings): string[] {
   const ids = new Set<string>(["concluido", "pago"]);
-  for (const status of attendanceStatuses(settings)) {
+  for (const status of allAttendanceStatuses(settings)) {
     if (isConcludedAttendanceStatus(status.id, settings)) ids.add(status.id);
   }
   return [...ids];

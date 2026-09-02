@@ -87,7 +87,7 @@ function ClientCard({
   client: KanbanListItem;
   compact?: boolean;
   showStatus: boolean;
-  statusLabel: (id: string) => string;
+  statusLabel: (id: string, snapshotLabel?: string) => string;
   statusColor: (id: string) => string;
   onOpen: (client: KanbanListItem) => void;
 }) {
@@ -108,7 +108,7 @@ function ClientCard({
       ) : null}
       {showStatus ? (
         <div className={cn("mt-1", compact && "origin-left scale-[0.85]")}>
-          <StatusBadge label={statusLabel(client.status)} color={statusColor(client.status)} />
+          <StatusBadge label={statusLabel(client.status, client.statusLabel)} color={statusColor(client.status)} />
         </div>
       ) : null}
     </button>
@@ -128,7 +128,7 @@ function DayColumn({
   compact?: boolean;
   fillParent?: boolean;
   showStatus: boolean;
-  statusLabel: (id: string) => string;
+  statusLabel: (id: string, snapshotLabel?: string) => string;
   statusColor: (id: string) => string;
   onOpen: (client: KanbanListItem) => void;
 }) {
@@ -198,7 +198,7 @@ function MonthDayCell({
   onOpen,
 }: {
   day: KanbanDayCell;
-  statusLabel: (id: string) => string;
+  statusLabel: (id: string, snapshotLabel?: string) => string;
   statusColor: (id: string) => string;
   onOpen: (client: KanbanListItem) => void;
 }) {
@@ -322,7 +322,8 @@ export function KanbanScreen({ initialView, initialItems }: Props) {
     [listKanban, navigate],
   );
 
-  const statusLabel = (statusId: string) => resolveAttendanceStatusLabel(statusId, settings);
+  const statusLabel = (statusId: string, snapshotLabel?: string) =>
+    resolveAttendanceStatusLabel(statusId, settings, snapshotLabel);
   const statusColor = (statusId: string) => resolveAttendanceStatusColor(statusId, settings);
 
   const openAttendance = (client: KanbanListItem) => {

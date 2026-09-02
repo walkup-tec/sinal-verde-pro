@@ -277,12 +277,32 @@ export function createEmptyAttendanceStatus(): AttendanceStatusConfig {
     color: DEFAULT_STATUS_COLOR,
     autoReturnDays: null,
     kind: "atendimento",
+    archived: false,
   };
 }
 
 function normalizeStatusKind(value: unknown, fallback: AttendanceStatusConfig["kind"]): AttendanceStatusConfig["kind"] {
   if (value === "contrato" || value === "atendimento") return value;
   return fallback;
+}
+
+/**
+ * Incoming = lista ativa da tela. Status do catálogo que não vieram na
+ * incoming são arquivados (nome preservado), nunca apagados.
+ */
+export function mergeAttendanceStatusCatalog(
+  base: AttendanceStatusConfig[],
+  incoming: AttendanceStatusConfig[],
+): AttendanceStatusConfig[] {
+  const incomingActive = incoming.filter((status) => !status.archived);
+  const incomingIds = new Set(incomingActive.map((status) => status.id));
+  const archived = base
+    .filter((status) => !incomingIds.has(status.id))
+    .map((status) => ({ ...status, archived: true as const }));
+  return [
+    ...incomingActive.map((status) => ({ ...status, archived: false as const })),
+    ...archived,
+  ];
 }
 
 export function normalizeAttendanceStatuses(
@@ -305,6 +325,7 @@ export function normalizeAttendanceStatuses(
         autoReturnDays:
           rawDays === undefined ? defaultDays : normalizeAutoReturnDays(rawDays),
         kind: normalizeStatusKind(rawKind, defaultKind),
+        archived: Boolean((status as { archived?: unknown }).archived),
       };
     })
     .filter((status) => {

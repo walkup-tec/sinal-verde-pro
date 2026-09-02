@@ -10,15 +10,22 @@ export function useSystemSettings() {
   const saveSettings = useServerFn(saveSystemSettingsFn);
   const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SYSTEM_SETTINGS);
   const [loading, setLoading] = useState(true);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let active = true;
     getSettings()
       .then((data) => {
-        if (active) setSettings(data);
+        if (active) {
+          setSettings(data);
+          setReady(true);
+        }
       })
       .catch(() => {
-        if (active) setSettings(DEFAULT_SYSTEM_SETTINGS);
+        if (active) {
+          setSettings(DEFAULT_SYSTEM_SETTINGS);
+          setReady(false);
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -30,13 +37,16 @@ export function useSystemSettings() {
 
   const persist = useCallback(
     async (next: SystemSettings, section: SettingsSaveSection = "all") => {
+      if (!ready) {
+        throw new Error("Aguarde o carregamento das configurações.");
+      }
       const saved = await saveSettings({ data: { settings: next, section } });
       setSettings(saved);
       window.dispatchEvent(new CustomEvent("sinal-verde-settings-changed", { detail: saved }));
       return saved;
     },
-    [saveSettings],
+    [saveSettings, ready],
   );
 
-  return { settings, setSettings: persist, loading };
+  return { settings, setSettings: persist, loading, ready };
 }

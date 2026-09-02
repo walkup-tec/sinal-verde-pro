@@ -272,14 +272,14 @@ export const bulkUpdateStatusFn = createServerFn({ method: "POST" })
       throw new Error("Status de atendimento inválido.");
     }
 
+    const statusLabel = resolveAttendanceStatusLabel(data.status, settings);
     const result = await bulkUpdateClientStatus({
       scope: data.scope,
       actorUserId: user.userId,
       isMaster: user.role === "master",
       status: data.status,
+      statusLabel,
     });
-
-    const statusLabel = resolveAttendanceStatusLabel(data.status, settings);
     const author = await findUserById(user.userId);
     const userName = author?.name ?? author?.email ?? "Usuário";
     const statusConfig = attendanceStatuses(settings).find((item) => item.id === data.status);
@@ -399,18 +399,19 @@ export const updateClientStatusFn = createServerFn({ method: "POST" })
     const previousValue =
       data.kind === "contrato" ? previous.contractStatus || "" : previous.status;
 
+    const statusLabel = resolveAttendanceStatusLabel(data.status, settings);
+    const previousLabel = previousValue
+      ? resolveAttendanceStatusLabel(previousValue, settings)
+      : "—";
+
     const client = await updateClientStatus(
       data.clientId,
       user.userId,
       user.role === "master",
       data.status,
       field,
+      statusLabel,
     );
-
-    const statusLabel = resolveAttendanceStatusLabel(data.status, settings);
-    const previousLabel = previousValue
-      ? resolveAttendanceStatusLabel(previousValue, settings)
-      : "—";
     const author = await findUserById(user.userId);
     const userName = author?.name ?? author?.email ?? "Usuário";
 

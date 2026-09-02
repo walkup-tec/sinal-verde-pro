@@ -52,7 +52,8 @@ function Dashboard() {
   const { summary } = Route.useLoaderData() as { summary: DashboardSummary };
   const { settings } = useSystemSettings();
 
-  const statusLabel = (statusId: string) => resolveAttendanceStatusLabel(statusId, settings);
+  const statusLabel = (statusId: string, snapshotLabel?: string) =>
+    resolveAttendanceStatusLabel(statusId, settings, snapshotLabel);
   const statusColor = (statusId: string) => resolveAttendanceStatusColor(statusId, settings);
 
   const productName = (productId: string) =>
@@ -179,7 +180,7 @@ function Dashboard() {
                         </td>
                         <td className="px-5 py-3">
                           <StatusBadge
-                            label={statusLabel(client.status)}
+                            label={statusLabel(client.status, client.statusLabel)}
                             color={statusColor(client.status)}
                           />
                         </td>
@@ -275,7 +276,7 @@ function Dashboard() {
                     </p>
                   </div>
                   <StatusBadge
-                    label={statusLabel(client.status)}
+                    label={statusLabel(client.status, client.statusLabel)}
                     color={statusColor(client.status)}
                   />
                 </div>

@@ -17,6 +17,8 @@ import type { AttendanceStatusConfig, StatusKind, SystemSettings } from "@/lib/c
 type Props = {
   settings: SystemSettings;
   onChange: (settings: SystemSettings) => void | Promise<unknown>;
+  /** false enquanto o GET inicial de configurações não terminou — evita gravar os defaults. */
+  ready?: boolean;
 };
 
 function prepareStatuses(list: AttendanceStatusConfig[]): AttendanceStatusConfig[] {
@@ -28,29 +30,36 @@ function prepareStatuses(list: AttendanceStatusConfig[]): AttendanceStatusConfig
       color: normalizeStatusColor(status.color, DEFAULT_STATUS_COLOR),
       autoReturnDays: normalizeAutoReturnDays(status.autoReturnDays),
       kind: (status.kind === "contrato" ? "contrato" : "atendimento") as StatusKind,
+      archived: false,
     }));
 }
 
-export function AttendanceStatusesSettings({ settings, onChange }: Props) {
+function visibleStatuses(list: AttendanceStatusConfig[]): AttendanceStatusConfig[] {
+  return list.filter((status) => !status.archived);
+}
+
+export function AttendanceStatusesSettings({ settings, onChange, ready = true }: Props) {
   const [statuses, setStatuses] = useState<AttendanceStatusConfig[]>(
-    settings.attendanceStatuses ?? [],
+    visibleStatuses(settings.attendanceStatuses ?? []),
   );
   const [saving, setSaving] = useState(false);
   const statusesRef = useRef(statuses);
   const settingsRef = useRef(settings);
   const dirtyRef = useRef(false);
   const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+  const readyRef = useRef(ready);
   statusesRef.current = statuses;
   settingsRef.current = settings;
+  readyRef.current = ready;
 
   useEffect(() => {
     if (saving || dirtyRef.current) return;
-    setStatuses(settings.attendanceStatuses ?? []);
+    setStatuses(visibleStatuses(settings.attendanceStatuses ?? []));
   }, [settings.attendanceStatuses, saving]);
 
   useEffect(() => {
     return () => {
-      if (!dirtyRef.current) return;
+      if (!readyRef.current || !dirtyRef.current) return;
       const filled = prepareStatuses(statusesRef.current);
       void onChange({ ...settingsRef.current, attendanceStatuses: filled }).catch(() => {
         /* unmount flush — toast já não ajuda */
@@ -70,6 +79,7 @@ export function AttendanceStatusesSettings({ settings, onChange }: Props) {
     if (!options?.quiet) setSaving(true);
 
     const run = async () => {
+      if (!readyRef.current) return;
       try {
         const missingKind = filled.some(
           (status) => status.kind !== "atendimento" && status.kind !== "contrato",
@@ -256,7 +266,7 @@ export function AttendanceStatusesSettings({ settings, onChange }: Props) {
                       className="shrink-0 text-destructive hover:text-destructive"
                       onClick={() => removeStatus(status.id)}
                       aria-label="Remover status"
-                      disabled={saving}
+                      disabled={saving || !ready}
                     >
                       <Trash2 className="size-4" />
                     </Button>
@@ -268,7 +278,7 @@ export function AttendanceStatusesSettings({ settings, onChange }: Props) {
                   <RadioGroup
                     value={status.kind}
                     onValueChange={(value) => {
-                      const kind = value === "contrato" ? "contrato" : "atendimento";
+                      const kind: StatusKind = value === "contrato" ? "contrato" : "atendimento";
                       const next = statusesRef.current.map((item) =>
                         item.id === status.id ? { ...item, kind } : item,
                       );
@@ -312,12 +322,12 @@ export function AttendanceStatusesSettings({ settings, onChange }: Props) {
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Button type="button" variant="outline" onClick={addStatus} disabled={saving}>
+          <Button type="button" variant="outline" onClick={addStatus} disabled={saving || !ready}>
             <Plus className="size-4" /> Adicionar status
           </Button>
           <Button
             type="button"
-            disabled={saving}
+            disabled={saving || !ready}
             onClick={() => void persistStatuses(statusesRef.current)}
           >
             Salvar status

@@ -42,6 +42,11 @@ export type AttendanceStatusConfig = {
   autoReturnDays: number | null;
   /** Atendimento (fluxo comercial) ou Contrato — obrigatório no cadastro. */
   kind: StatusKind;
+  /**
+   * Status removido da tela de Configurações. Permanece no catálogo para
+   * resolver o nome nos clientes que ainda o usam.
+   */
+  archived?: boolean;
 };
 
 export type SystemSettings = {

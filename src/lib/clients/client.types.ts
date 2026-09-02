@@ -22,8 +22,11 @@ export type ClientRecord = {
   display: ClientImportDisplay;
   /** Status de atendimento (kind = atendimento). */
   status: string;
+  /** Nome do status no momento da atribuição — sobrevive à exclusão do catálogo. */
+  statusLabel?: string;
   /** Status de contrato (kind = contrato); vazio até o usuário definir. */
   contractStatus: string;
+  contractStatusLabel?: string;
   createdAt: string;
 };
 
@@ -117,6 +120,8 @@ export type ClientListItem = ClientActivityFlags & {
   /** Produtos vinculados (primary + extras via client_products). */
   productIds: string[];
   status: string;
+  /** Nome gravado com o status; usado se o cadastro foi excluído. */
+  statusLabel?: string;
   nome: string | null;
   cpf: string | null;
   telefone: string | null;

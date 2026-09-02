@@ -1,7 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { cloneDefaultFieldGroups } from "@/lib/config/client-fields";
-import { DEFAULT_SYSTEM_SETTINGS, normalizeSettings } from "@/lib/config/settings-defaults";
+import { DEFAULT_SYSTEM_SETTINGS, mergeAttendanceStatusCatalog, normalizeSettings } from "@/lib/config/settings-defaults";
+import { extractStatusLabelFromNote } from "@/lib/clients/client-status";
 import type {
   AttendanceStatusConfig,
   BankConfig,
@@ -67,6 +68,8 @@ async function loadSystemSettingsFromPostgres(): Promise<SystemSettings> {
       updated_at timestamptz not null default now()
     )
   `;
+  await ensureAttendanceStatusArchiveColumn(sql);
+  await recoverOrphanAttendanceStatuses(sql);
 
   const [
     categories,
@@ -104,11 +107,12 @@ async function loadSystemSettingsFromPostgres(): Promise<SystemSettings> {
         auto_return_days: number | null;
         kind: string | null;
         sort_order: number;
+        archived_at: Date | null;
       }[]
     >`
-      select id, label, color, auto_return_days, kind, sort_order
+      select id, label, color, auto_return_days, kind, sort_order, archived_at
       from crm.attendance_statuses
-      order by sort_order, label
+      order by archived_at nulls first, sort_order, label
     `,
     sql<{ groups_json: ClientFieldGroup[] }[]>`
       select groups_json from crm.client_field_catalog where id = 'default' limit 1
@@ -154,6 +158,7 @@ async function loadSystemSettingsFromPostgres(): Promise<SystemSettings> {
       color: status.color ?? "#64748b",
       autoReturnDays: status.auto_return_days,
       kind: status.kind === "contrato" ? "contrato" : "atendimento",
+      archived: Boolean(status.archived_at),
     })),
     fieldGroups: Array.isArray(fieldCatalog[0]?.groups_json)
       ? fieldCatalog[0].groups_json
@@ -343,12 +348,93 @@ async function syncOperations(tx: Tx, operations: OperationConfig[]): Promise<vo
   `;
 }
 
-async function syncAttendanceStatuses(tx: Tx, statuses: AttendanceStatusConfig[]): Promise<void> {
-  if (statuses.length === 0) {
-    await tx`delete from crm.attendance_statuses`;
-    return;
+async function ensureAttendanceStatusArchiveColumn(sql: Awaited<ReturnType<typeof getSql>>): Promise<void> {
+  await sql`
+    alter table crm.attendance_statuses
+    add column if not exists archived_at timestamptz null
+  `;
+}
+
+async function recoverOrphanAttendanceStatuses(sql: Awaited<ReturnType<typeof getSql>>): Promise<void> {
+  await sql`
+    alter table crm.clients
+    add column if not exists status_label text not null default ''
+  `;
+  await sql`
+    alter table crm.clients
+    add column if not exists contract_status_label text not null default ''
+  `;
+
+  const existing = await sql<{ id: string }[]>`select id from crm.attendance_statuses`;
+  const existingIds = new Set(existing.map((row) => row.id));
+  const used = await sql<{ id: string }[]>`
+    select distinct status as id from crm.clients
+    where coalesce(nullif(trim(status), ''), '') <> ''
+    union
+    select distinct contract_status as id from crm.clients
+    where coalesce(nullif(trim(contract_status), ''), '') <> ''
+  `;
+  const missing = used.map((row) => row.id).filter((id) => id && !existingIds.has(id));
+
+  if (missing.length > 0) {
+    const notes = await sql<{ status: string; note: string }[]>`
+      select distinct on (c.status) c.status, a.note
+      from crm.clients c
+      inner join crm.client_attendances a on a.client_id = c.id
+      where c.status = any(${missing})
+        and (
+          a.note ilike '%alterado para:%'
+          or a.note ilike '%definido como:%'
+          or a.note ilike '%em lote para:%'
+        )
+      order by c.status, a.created_at desc
+    `;
+    const labelById = new Map(
+      notes.map((row) => [row.status, extractStatusLabelFromNote(row.note)] as const),
+    );
+
+    for (const id of missing) {
+      const label = labelById.get(id)?.trim() || id;
+      await sql`
+        insert into crm.attendance_statuses (
+          id, label, color, auto_return_days, kind, sort_order, archived_at, updated_at
+        )
+        values (
+          ${id},
+          ${label},
+          ${"#64748b"},
+          ${null},
+          ${"atendimento"},
+          ${1000},
+          now(),
+          now()
+        )
+        on conflict (id) do nothing
+      `;
+    }
   }
 
+  await sql`
+    update crm.clients c
+    set status_label = s.label
+    from crm.attendance_statuses s
+    where c.status = s.id
+      and coalesce(c.status_label, '') = ''
+      and coalesce(s.label, '') <> ''
+      and s.label <> s.id
+  `;
+  await sql`
+    update crm.clients c
+    set contract_status_label = s.label
+    from crm.attendance_statuses s
+    where c.contract_status = s.id
+      and coalesce(c.contract_status_label, '') = ''
+      and coalesce(s.label, '') <> ''
+      and s.label <> s.id
+  `;
+}
+
+async function syncAttendanceStatuses(tx: Tx, statuses: AttendanceStatusConfig[]): Promise<void> {
   const payload = statuses.map((status, index) => ({
     id: status.id,
     label: status.label,
@@ -356,33 +442,57 @@ async function syncAttendanceStatuses(tx: Tx, statuses: AttendanceStatusConfig[]
     auto_return_days: status.autoReturnDays,
     kind: status.kind,
     sort_order: index + 1,
+    archived: Boolean(status.archived),
   }));
 
+  if (payload.length === 0) {
+    await tx`
+      update crm.attendance_statuses
+      set archived_at = coalesce(archived_at, now()), updated_at = now()
+      where archived_at is null
+    `;
+    return;
+  }
+
+  const ids = payload.map((status) => status.id);
+
   await tx`
-    with input as (
-      select *
-      from jsonb_to_recordset(${tx.json(payload)}) as x(
-        id text, label text, color text, auto_return_days int, kind text, sort_order int
-      )
-    ),
-    del_statuses as (
-      delete from crm.attendance_statuses s
-      where not exists (select 1 from input i where i.id = s.id)
-      returning 1
-    ),
-    upsert_statuses as (
-      insert into crm.attendance_statuses (id, label, color, auto_return_days, kind, sort_order, updated_at)
-      select id, label, color, auto_return_days, kind, sort_order, now() from input
-      on conflict (id) do update set
-        label = excluded.label,
-        color = excluded.color,
-        auto_return_days = excluded.auto_return_days,
-        kind = excluded.kind,
-        sort_order = excluded.sort_order,
-        updated_at = now()
-      returning id
+    insert into crm.attendance_statuses (id, label, color, auto_return_days, kind, sort_order, archived_at, updated_at)
+    select id, label, color, auto_return_days, kind, sort_order,
+      case when archived then now() else null end,
+      now()
+    from jsonb_to_recordset(${tx.json(payload)}) as x(
+      id text, label text, color text, auto_return_days int, kind text, sort_order int, archived boolean
     )
-    select 1
+    on conflict (id) do update set
+      label = excluded.label,
+      color = excluded.color,
+      auto_return_days = excluded.auto_return_days,
+      kind = excluded.kind,
+      sort_order = excluded.sort_order,
+      archived_at = excluded.archived_at,
+      updated_at = now()
+  `;
+
+  await tx`
+    update crm.attendance_statuses
+    set archived_at = coalesce(archived_at, now()), updated_at = now()
+    where archived_at is null
+      and not (id = any(${ids}))
+  `;
+
+  await tx`
+    alter table crm.clients
+    add column if not exists status_label text not null default ''
+  `;
+  await tx`
+    update crm.clients c
+    set status_label = s.label
+    from crm.attendance_statuses s
+    where c.status = s.id
+      and s.archived_at is not null
+      and coalesce(c.status_label, '') = ''
+      and coalesce(s.label, '') <> ''
   `;
 }
 
@@ -398,7 +508,7 @@ function mergeSettingsForSection(
     operations: section === "all" || section === "operations" ? incoming.operations : base.operations,
     attendanceStatuses:
       section === "all" || section === "attendanceStatuses"
-        ? incoming.attendanceStatuses
+        ? mergeAttendanceStatusCatalog(base.attendanceStatuses, incoming.attendanceStatuses)
         : base.attendanceStatuses,
     fieldGroups:
       section === "all" || section === "products" ? incoming.fieldGroups : base.fieldGroups,
@@ -410,7 +520,7 @@ async function saveSystemSettingsToPostgres(
   section: SettingsSaveSection = "all",
 ): Promise<SystemSettings> {
   const incoming = normalizeSettings(settings);
-  const base = cachedSettings ?? (await loadSystemSettingsFromPostgres());
+  const base = await loadSystemSettingsFromPostgres();
   const next = mergeSettingsForSection(base, incoming, section);
   const sql = await getSql();
   await ensureFieldCatalogTable(sql);
@@ -418,6 +528,7 @@ async function saveSystemSettingsToPostgres(
     alter table crm.attendance_statuses
     add column if not exists kind text not null default 'atendimento'
   `;
+  await ensureAttendanceStatusArchiveColumn(sql);
   await sql`
     create table if not exists crm.operations (
       id text primary key,

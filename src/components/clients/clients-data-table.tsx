@@ -17,7 +17,7 @@ import { formatCurrencyBrlDisplay } from "@/lib/masks/br-currency";
 type Props = {
   items: Array<ClientListItem & { contactDate?: string }>;
   productName: (productId: string) => string;
-  statusLabel: (statusId: string) => string;
+  statusLabel: (statusId: string, snapshotLabel?: string) => string;
   statusColor?: (statusId: string) => string;
   onAction: (client: ClientListItem, action: ClientActionKind) => void;
   dimmed?: boolean;
@@ -110,7 +110,7 @@ export function ClientsDataTable({
                 </TableCell>
                 <TableCell>
                   <StatusBadge
-                    label={statusLabel(client.status)}
+                    label={statusLabel(client.status, client.statusLabel)}
                     color={statusColor?.(client.status)}
                   />
                 </TableCell>
