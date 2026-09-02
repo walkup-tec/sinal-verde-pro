@@ -27,7 +27,7 @@ type Props = {
   onAction: (client: ClientListItem, action: ClientActionKind) => void;
   dimmed?: boolean;
   /**
-   * Remarketing: mostra Agendamento (data do contato) e Criação (quando o agendamento foi feito).
+   * Remarketing: mostra Criação (quando o agendamento foi feito) e Agendamento (data do contato).
    */
   showContactDate?: boolean;
   /** Quando omitido (ex.: Agenda), a coluna de seleção fica ocultada. */
@@ -91,8 +91,8 @@ export function ClientsDataTable({
             <TableHead>Cliente</TableHead>
             {showContactDate ? (
               <>
-                <TableHead>Agendamento</TableHead>
                 <TableHead>Criação</TableHead>
+                <TableHead>Agendamento</TableHead>
               </>
             ) : null}
             <TableHead>Produto</TableHead>
@@ -120,10 +120,10 @@ export function ClientsDataTable({
                 {showContactDate ? (
                   <>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {client.contactDate ? formatLocalDateLabel(client.contactDate) : "—"}
+                      {scheduleCreatedLabel(client.scheduleCreatedAt)}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {scheduleCreatedLabel(client.scheduleCreatedAt)}
+                      {client.contactDate ? formatLocalDateLabel(client.contactDate) : "—"}
                     </TableCell>
                   </>
                 ) : null}
