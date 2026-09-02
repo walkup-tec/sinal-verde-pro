@@ -4,6 +4,7 @@ import { Download, Loader2, Paperclip, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   appendClientAttachmentChunkFn,
   deleteClientAttachmentFn,
@@ -28,11 +29,38 @@ type UploadState = {
   progress: number;
 };
 
+const FILE_NAME_MAX_CHARS = 20;
+
+function truncateFileName(fileName: string): string {
+  if (fileName.length <= FILE_NAME_MAX_CHARS) return fileName;
+  return `${fileName.slice(0, FILE_NAME_MAX_CHARS)}...`;
+}
+
 function formatAttachmentDate(value: string): string {
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function AttachmentFileName({ fileName, className }: { fileName: string; className?: string }) {
+  const truncated = truncateFileName(fileName);
+  if (fileName.length <= FILE_NAME_MAX_CHARS) {
+    return <p className={className}>{fileName}</p>;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <p className={className ? `${className} cursor-help` : "cursor-help"} tabIndex={0}>
+          {truncated}
+        </p>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="z-[80] max-w-xs break-all">
+        {fileName}
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 export function ClientAttachmentsPanel({
@@ -211,8 +239,14 @@ export function ClientAttachmentsPanel({
       {uploading ? (
         <div className="space-y-2 rounded-lg border border-border/60 px-3 py-3">
           <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span className="truncate">Enviando {uploading.fileName}</span>
-            <span>{uploading.progress}%</span>
+            <span className="flex min-w-0 flex-1 items-baseline gap-1">
+              <span className="shrink-0">Enviando</span>
+              <AttachmentFileName
+                fileName={uploading.fileName}
+                className="min-w-0 text-xs text-muted-foreground"
+              />
+            </span>
+            <span className="shrink-0">{uploading.progress}%</span>
           </div>
           <Progress value={uploading.progress} className="h-2" />
         </div>
@@ -232,11 +266,14 @@ export function ClientAttachmentsPanel({
           {attachments.map((attachment) => (
             <div
               key={attachment.id}
-              className="flex items-start gap-3 rounded-lg border border-border/60 bg-background px-3 py-3"
+              className="flex min-w-0 items-start gap-3 overflow-hidden rounded-lg border border-border/60 bg-background px-3 py-3"
             >
               <Paperclip className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{attachment.fileName}</p>
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <AttachmentFileName
+                  fileName={attachment.fileName}
+                  className="text-sm font-medium"
+                />
                 <p className="text-xs text-muted-foreground">
                   {formatFileSize(attachment.fileSize)} · {formatAttachmentDate(attachment.createdAt)} ·{" "}
                   {attachment.userName}
