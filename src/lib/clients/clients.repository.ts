@@ -9,6 +9,7 @@ import { getClientActivityFlagsForClients } from "@/lib/clients/client-activity.
 import { concludedAttendanceStatusIds, isConcludedAttendanceStatus } from "@/lib/clients/client-status";
 import type {
   AgendaAlertCounts,
+  AgendaClientListItem,
   AgendaFilter,
   AgendaListQuery,
   ClientActivityFlags,
@@ -908,7 +909,7 @@ async function listScheduledClientsFromPostgres(
   userId: string,
   isMaster: boolean,
   query: Required<Pick<AgendaListQuery, "filter" | "pendingOnly">>,
-): Promise<ClientListItem[]> {
+): Promise<AgendaClientListItem[]> {
   const sql = await getSql();
   await ensureClientContractStatusColumn(sql);
   const settings = await loadSystemSettingsFromDisk();
@@ -949,7 +950,7 @@ async function listScheduledClientsFromPostgres(
         )
       )`;
 
-  const rows = await sql<ClientListRow[]>`
+  const rows = await sql<RemarketingListRow[]>`
     select
       c.id,
       c.product_id,
@@ -963,6 +964,8 @@ async function listScheduledClientsFromPostgres(
       c.distribution,
       c.display,
       c.created_at,
+      sch.contact_date,
+      sch.created_at as schedule_created_at,
       ${sql.unsafe(CLIENT_LIST_ACTIVITY_COLUMNS)}
     from crm.client_schedules sch
     inner join crm.clients c on c.id = sch.client_id
@@ -970,17 +973,17 @@ async function listScheduledClientsFromPostgres(
     order by sch.contact_date asc, c.data->>'nome' asc nulls last
   `;
 
-  return rows.map(mapClientListRow);
+  return rows.map(mapRemarketingListRow);
 }
 
 async function listScheduledClientsFromDisk(
   userId: string,
   isMaster: boolean,
   query: Required<Pick<AgendaListQuery, "filter" | "pendingOnly">>,
-): Promise<ClientListItem[]> {
+): Promise<AgendaClientListItem[]> {
   const clients = await listClientsForUser(userId, true);
   const settings = await loadSystemSettingsFromDisk();
-  const items: ClientListItem[] = [];
+  const items: AgendaClientListItem[] = [];
 
   for (const client of clients) {
     const schedule = await getClientSchedule(client.id);
@@ -993,14 +996,36 @@ async function listScheduledClientsFromDisk(
       continue;
     }
     if (!matchesAgendaListQuery(schedule.contactDate, client.status, query, settings)) continue;
-    items.push(mapClientListItem(client));
+    items.push({
+      ...mapClientListItem(client),
+      contactDate: schedule.contactDate,
+      scheduleCreatedAt: schedule.createdAt,
+    });
   }
 
-  return enrichClientListItems(
-    items.sort((left, right) =>
-      (left.nome ?? left.cpf ?? "").localeCompare(right.nome ?? right.cpf ?? "", "pt-BR"),
-    ),
+  const scheduleMetaById = new Map(
+    items.map((item) => [
+      item.id,
+      { contactDate: item.contactDate, scheduleCreatedAt: item.scheduleCreatedAt },
+    ]),
   );
+
+  const enriched = await enrichClientListItems(
+    items.sort((left, right) => {
+      const byDate = left.contactDate.localeCompare(right.contactDate);
+      if (byDate !== 0) return byDate;
+      return (left.nome ?? left.cpf ?? "").localeCompare(right.nome ?? right.cpf ?? "", "pt-BR");
+    }),
+  );
+
+  return enriched.map((item) => {
+    const meta = scheduleMetaById.get(item.id);
+    return {
+      ...item,
+      contactDate: meta?.contactDate ?? "",
+      scheduleCreatedAt: meta?.scheduleCreatedAt ?? "",
+    };
+  });
 }
 
 function normalizeAgendaListQuery(query: AgendaListQuery = {}): Required<Pick<AgendaListQuery, "filter" | "pendingOnly">> {
@@ -1019,7 +1044,7 @@ export async function listScheduledClientsForUser(
   userId: string,
   isMaster: boolean,
   query: AgendaListQuery = {},
-): Promise<ClientListItem[]> {
+): Promise<AgendaClientListItem[]> {
   const normalized = normalizeAgendaListQuery(query);
   if (isDatabaseEnabled()) {
     return listScheduledClientsFromPostgres(userId, isMaster, normalized);

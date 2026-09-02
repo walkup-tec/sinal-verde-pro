@@ -13,13 +13,13 @@ import {
   resolveAttendanceStatusColor,
   resolveAttendanceStatusLabel,
 } from "@/lib/clients/client-status";
-import type { AgendaFilter, ClientListItem } from "@/lib/clients/client.types";
+import type { AgendaClientListItem, AgendaFilter, ClientListItem } from "@/lib/clients/client.types";
 import { cn } from "@/lib/utils";
 
 type Props = {
   initialFilter: AgendaFilter;
   initialPendingOnly: boolean;
-  initialItems: ClientListItem[];
+  initialItems: AgendaClientListItem[];
 };
 
 const FILTERS: { id: AgendaFilter; label: string; pendingOnly?: boolean }[] = [
@@ -47,7 +47,7 @@ export function AgendaScreen({ initialFilter, initialPendingOnly, initialItems }
   const [pendingOnly, setPendingOnly] = useState(initialPendingOnly);
   const [items, setItems] = useState(initialItems);
   const [loading, setLoading] = useState(false);
-  const [actionClient, setActionClient] = useState<ClientListItem | null>(null);
+  const [actionClient, setActionClient] = useState<AgendaClientListItem | null>(null);
   const [actionKind, setActionKind] = useState<ClientActionKind | null>(null);
 
   useEffect(() => {
@@ -91,7 +91,12 @@ export function AgendaScreen({ initialFilter, initialPendingOnly, initialItems }
   const statusColor = (statusId: string) => resolveAttendanceStatusColor(statusId, settings);
 
   const openAction = (client: ClientListItem, action: ClientActionKind) => {
-    setActionClient(client);
+    const row = items.find((item) => item.id === client.id) ?? {
+      ...client,
+      contactDate: "",
+      scheduleCreatedAt: "",
+    };
+    setActionClient(row);
     setActionKind(action);
   };
 
@@ -100,7 +105,7 @@ export function AgendaScreen({ initialFilter, initialPendingOnly, initialItems }
     setActionKind(null);
   }, []);
 
-  const patchClient = useCallback((clientId: string, patch: Partial<ClientListItem>) => {
+  const patchClient = useCallback((clientId: string, patch: Partial<AgendaClientListItem>) => {
     setItems((prev) =>
       prev.map((item) => (item.id === clientId ? { ...item, ...patch } : item)),
     );
@@ -178,6 +183,7 @@ export function AgendaScreen({ initialFilter, initialPendingOnly, initialItems }
                 statusColor={statusColor}
                 onAction={openAction}
                 dimmed={loading}
+                showContactDate
               />
             )}
           </CardContent>

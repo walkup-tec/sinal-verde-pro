@@ -27,7 +27,7 @@ type Props = {
   onAction: (client: ClientListItem, action: ClientActionKind) => void;
   dimmed?: boolean;
   /**
-   * Remarketing: mostra Criação (quando o agendamento foi feito) e Agendamento (data do contato).
+   * Agenda/Remarketing: mostra Criação (quando o agendamento foi feito) e Agendamento (data do contato).
    */
   showContactDate?: boolean;
   /** Quando omitido (ex.: Agenda), a coluna de seleção fica ocultada. */

@@ -166,6 +166,12 @@ export type RemarketingListItem = ClientListItem & {
   scheduleCreatedAt: string;
 };
 
+/** Linha da Agenda com datas de criação do agendamento e do contato. */
+export type AgendaClientListItem = ClientListItem & {
+  contactDate: string;
+  scheduleCreatedAt: string;
+};
+
 /** Modos do quadro Kanban. */
 export type KanbanViewMode = "status" | "weekly" | "monthly";
 
