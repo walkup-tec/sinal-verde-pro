@@ -7,6 +7,8 @@ import {
   formatDateLabelBr,
   formatIsoDateLocal,
   parseIsoDateLocal,
+  scheduleCalendarEndMonth,
+  scheduleCalendarStartMonth,
 } from "@/lib/dates/date-picker";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +35,8 @@ export function DatePickerField({
   const [open, setOpen] = useState(false);
   const selected = parseIsoDateLocal(value);
   const label = formatDateLabelBr(value);
+  const startMonth = scheduleCalendarStartMonth(selected);
+  const endMonth = scheduleCalendarEndMonth();
 
   return (
     <div className={cn("flex items-center gap-1", className)}>
@@ -56,7 +60,9 @@ export function DatePickerField({
           <Calendar
             mode="single"
             selected={selected}
-            defaultMonth={selected}
+            defaultMonth={selected ?? startMonth}
+            startMonth={startMonth}
+            endMonth={endMonth}
             captionLayout="dropdown"
             onSelect={(date) => {
               if (!date) return;
