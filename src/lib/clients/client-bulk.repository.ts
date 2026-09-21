@@ -336,6 +336,65 @@ export async function bulkUpdateClientStatus(input: {
   return { affected: updated.length, clientIds: updated.map((row) => row.id) };
 }
 
+/**
+ * Aplica o mesmo valor de um campo do cadastro a todos os clientes da seleção.
+ */
+export async function bulkUpdateClientField(input: {
+  scope: ClientBulkScope;
+  actorUserId: string;
+  isMaster: boolean;
+  fieldId: string;
+  value: string;
+}): Promise<{ affected: number }> {
+  const fieldId = input.fieldId.trim();
+  if (!fieldId) throw new Error("Selecione o campo.");
+  const value = input.value.trim();
+  if (!value) throw new Error("Informe o valor do campo.");
+
+  const clientIds = await resolveClientIdsFromScope(input.scope, input.actorUserId, input.isMaster);
+  if (clientIds.length === 0) throw new Error("Nenhum cliente selecionado.");
+
+  if (isDatabaseEnabled()) {
+    const sql = await getSql();
+    const path = `{${fieldId}}`;
+    const updated = await sql<{ id: string }[]>`
+      update crm.clients
+      set
+        data = jsonb_set(coalesce(data, '{}'::jsonb), ${path}::text[], to_jsonb(${value}::text), true),
+        updated_at = ${new Date().toISOString()}
+      where id in ${sql(clientIds)}
+      returning id
+    `;
+    return { affected: updated.length };
+  }
+
+  // Fallback JSON (preview local)
+  const { readFile, writeFile, mkdir } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  const file = join(process.cwd(), "data", "clients.json");
+  await mkdir(join(process.cwd(), "data"), { recursive: true });
+  let clients: Array<{ id: string; data?: Record<string, string> }> = [];
+  try {
+    const raw = await readFile(file, "utf8");
+    const parsed = JSON.parse(raw);
+    clients = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    clients = [];
+  }
+  const idSet = new Set(clientIds);
+  let affected = 0;
+  const next = clients.map((client) => {
+    if (!idSet.has(client.id)) return client;
+    affected += 1;
+    return {
+      ...client,
+      data: { ...(client.data ?? {}), [fieldId]: value },
+    };
+  });
+  await writeFile(file, JSON.stringify(next, null, 2), "utf8");
+  return { affected };
+}
+
 export async function listClientsForBulkExport(input: {
   scope: ClientBulkScope;
   actorUserId: string;

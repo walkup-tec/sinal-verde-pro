@@ -26,6 +26,7 @@ import {
   bulkAddProductToClients,
   bulkDeleteClients,
   bulkScheduleClientsForUser,
+  bulkUpdateClientField,
   bulkUpdateClientStatus,
   countClientsInBulkScope,
   listClientsForBulkExport,
@@ -321,6 +322,40 @@ export const bulkUpdateStatusFn = createServerFn({ method: "POST" })
     }
 
     return { affected: result.affected };
+  });
+
+export const bulkUpdateFieldFn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => {
+    if (!data || typeof data !== "object") throw new Error("Dados inválidos.");
+    const payload = data as { scope?: unknown; fieldId?: string; value?: string };
+    const scope = parseBulkScope(payload.scope);
+    if (!payload.fieldId?.trim()) throw new Error("Selecione o campo.");
+    if (typeof payload.value !== "string" || !payload.value.trim()) {
+      throw new Error("Informe o valor do campo.");
+    }
+    return {
+      scope,
+      fieldId: payload.fieldId.trim() as ClientFieldId,
+      value: payload.value.trim(),
+    };
+  })
+  .handler(async ({ data }) => {
+    const user = await requireClientesAccess();
+    const settings = await loadSystemSettingsFromDisk();
+    const catalogIds = new Set(
+      (settings.fieldGroups ?? []).flatMap((group) => group.fields.map((field) => field.id)),
+    );
+    if (!catalogIds.has(data.fieldId)) {
+      throw new Error("Campo inválido.");
+    }
+
+    return bulkUpdateClientField({
+      scope: data.scope,
+      actorUserId: user.userId,
+      isMaster: user.role === "master",
+      fieldId: data.fieldId,
+      value: data.value,
+    });
   });
 
 export const deleteClientAttendanceFn = createServerFn({ method: "POST" })

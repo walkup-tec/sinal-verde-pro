@@ -1,7 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { CalendarDays, Download, ListChecks, PackagePlus, Trash2 } from "lucide-react";
+import {
+  CalendarDays,
+  Check,
+  ChevronsUpDown,
+  Download,
+  FormInput,
+  ListChecks,
+  PackagePlus,
+  Trash2,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,11 +29,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { ClientFieldInput } from "@/components/clients/client-field-input";
 import {
   bulkAddProductFn,
   bulkDeleteClientsFn,
   bulkExportClientsFn,
   bulkScheduleClientsFn,
+  bulkUpdateFieldFn,
   bulkUpdateStatusFn,
   countBulkClientsFn,
   listUsersForBulkActionsFn,
@@ -32,10 +52,15 @@ import {
 import type { ClientBulkScope } from "@/lib/clients/client.types";
 import { useSystemSettings } from "@/hooks/use-system-settings";
 import { attendanceKindStatuses } from "@/lib/clients/client-status";
+import {
+  CLIENT_FIELD_GROUPS,
+  type ClientFieldId,
+} from "@/lib/config/client-fields";
 import { localDateString } from "@/lib/dates/local-date";
 import { downloadBase64File } from "@/lib/utils/download-base64";
+import { cn } from "@/lib/utils";
 
-type BulkAction = "schedule" | "product" | "status" | "export" | "delete";
+type BulkAction = "schedule" | "product" | "status" | "fields" | "export" | "delete";
 
 type Props = {
   open: boolean;
@@ -43,6 +68,12 @@ type Props = {
   scope: ClientBulkScope | null;
   selectionLabel: string;
   onCompleted: () => void;
+};
+
+type CatalogFieldOption = {
+  id: ClientFieldId;
+  label: string;
+  groupTitle: string;
 };
 
 export function ClientBulkActionsModal({
@@ -57,6 +88,7 @@ export function ClientBulkActionsModal({
   const scheduleBulk = useServerFn(bulkScheduleClientsFn);
   const addProductBulk = useServerFn(bulkAddProductFn);
   const updateStatusBulk = useServerFn(bulkUpdateStatusFn);
+  const updateFieldBulk = useServerFn(bulkUpdateFieldFn);
   const exportBulk = useServerFn(bulkExportClientsFn);
   const deleteBulk = useServerFn(bulkDeleteClientsFn);
   const listUsers = useServerFn(listUsersForBulkActionsFn);
@@ -69,6 +101,25 @@ export function ClientBulkActionsModal({
   const [contactDateIso, setContactDateIso] = useState(() => localDateString());
   const [productId, setProductId] = useState("");
   const [statusId, setStatusId] = useState("");
+  const [fieldId, setFieldId] = useState<ClientFieldId>("");
+  const [fieldValue, setFieldValue] = useState("");
+  const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
+
+  const catalogFields = useMemo<CatalogFieldOption[]>(() => {
+    const groups = settings.fieldGroups?.length ? settings.fieldGroups : CLIENT_FIELD_GROUPS;
+    return groups.flatMap((group) =>
+      group.fields.map((field) => ({
+        id: field.id,
+        label: field.label,
+        groupTitle: group.title,
+      })),
+    );
+  }, [settings.fieldGroups]);
+
+  const selectedField = useMemo(
+    () => catalogFields.find((field) => field.id === fieldId) ?? null,
+    [catalogFields, fieldId],
+  );
 
   useEffect(() => {
     if (!open || !scope) return;
@@ -95,6 +146,14 @@ export function ClientBulkActionsModal({
     };
   }, [open, scope, countBulk, listUsers, settings]);
 
+  useEffect(() => {
+    if (!open) {
+      setFieldId("");
+      setFieldValue("");
+      setFieldPickerOpen(false);
+    }
+  }, [open]);
+
   const runAction = async () => {
     if (!scope) return;
     setLoading(true);
@@ -118,6 +177,17 @@ export function ClientBulkActionsModal({
         if (!statusId) throw new Error("Selecione o status.");
         const result = await updateStatusBulk({ data: { scope, status: statusId } });
         toast.success(`Status atualizado em ${result.affected} cliente(s).`);
+        onOpenChange(false);
+        onCompleted();
+      } else if (action === "fields") {
+        if (!fieldId) throw new Error("Selecione o campo.");
+        if (!fieldValue.trim()) throw new Error("Informe o valor do campo.");
+        const result = await updateFieldBulk({
+          data: { scope, fieldId, value: fieldValue },
+        });
+        toast.success(
+          `Campo "${selectedField?.label ?? fieldId}" atualizado em ${result.affected} cliente(s).`,
+        );
         onOpenChange(false);
         onCompleted();
       } else if (action === "export") {
@@ -150,7 +220,7 @@ export function ClientBulkActionsModal({
         </DialogHeader>
 
         <div className="space-y-5">
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             <Button
               type="button"
               variant={action === "schedule" ? "default" : "outline"}
@@ -177,6 +247,15 @@ export function ClientBulkActionsModal({
             >
               <ListChecks className="size-4 shrink-0" />
               <span>Alterar status</span>
+            </Button>
+            <Button
+              type="button"
+              variant={action === "fields" ? "default" : "outline"}
+              className="h-auto min-h-10 justify-start whitespace-normal px-3 py-2 text-left"
+              onClick={() => setAction("fields")}
+            >
+              <FormInput className="size-4 shrink-0" />
+              <span>Alterar campos</span>
             </Button>
             <Button
               type="button"
@@ -267,6 +346,92 @@ export function ClientBulkActionsModal({
               <p className="text-xs text-muted-foreground">
                 Aplica o status a todos os clientes da seleção (filtro ou IDs). Registra nota de
                 atendimento e agenda retorno automático quando o status tiver essa regra.
+              </p>
+            </div>
+          ) : null}
+
+          {action === "fields" ? (
+            <div className="space-y-3 rounded-lg border border-border/60 p-3">
+              <div className="space-y-2">
+                <Label>Campo a alterar</Label>
+                <Popover open={fieldPickerOpen} onOpenChange={setFieldPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={fieldPickerOpen}
+                      className="h-9 w-full justify-between font-normal"
+                    >
+                      <span className={cn("truncate", !selectedField && "text-muted-foreground")}>
+                        {selectedField
+                          ? `${selectedField.label} · ${selectedField.groupTitle}`
+                          : "Pesquisar ou selecionar campo…"}
+                      </span>
+                      <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[var(--radix-popover-trigger-width)] p-0"
+                    align="start"
+                  >
+                    <Command>
+                      <CommandInput placeholder="Digite parte do nome do campo…" />
+                      <CommandList>
+                        <CommandEmpty>Nenhum campo encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {catalogFields.map((field) => (
+                            <CommandItem
+                              key={field.id}
+                              value={`${field.label} ${field.groupTitle} ${field.id}`}
+                              onSelect={() => {
+                                setFieldId(field.id);
+                                setFieldValue("");
+                                setFieldPickerOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "size-4",
+                                  fieldId === field.id ? "opacity-100" : "opacity-0",
+                                )}
+                              />
+                              <span className="truncate">{field.label}</span>
+                              <span className="ml-auto truncate text-xs text-muted-foreground">
+                                {field.groupTitle}
+                              </span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {fieldId ? (
+                <div className="space-y-2">
+                  <Label htmlFor="bulk-field-value">
+                    Novo valor{selectedField ? ` · ${selectedField.label}` : ""}
+                  </Label>
+                  <ClientFieldInput
+                    id="bulk-field-value"
+                    fieldId={fieldId}
+                    value={fieldValue}
+                    onChange={setFieldValue}
+                    banks={settings.banks}
+                    operations={settings.operations}
+                  />
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Selecione um campo para informar o valor no formato correto (CPF, telefone, moeda,
+                  data, listas etc.).
+                </p>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                O valor escolhido será aplicado a todos os clientes da seleção.
               </p>
             </div>
           ) : null}
