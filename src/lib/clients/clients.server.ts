@@ -43,6 +43,7 @@ import {
   getClientByIdForUser,
   importClients,
   listClientsPageForUser,
+  updateClientData,
   updateClientStatus,
 } from "@/lib/clients/clients.repository";
 import { loadSystemSettingsFromDisk } from "@/lib/config/settings.repository";
@@ -363,6 +364,26 @@ export const getClientDetailFn = createServerFn({ method: "POST" })
     const client = await getClientByIdForUser(data.clientId, user.userId, user.role === "master");
     if (!client) throw new Error("Cliente não encontrado.");
     return client;
+  });
+
+export const updateClientDataFn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => {
+    if (!data || typeof data !== "object") throw new Error("Dados inválidos.");
+    const payload = data as { clientId?: string; fields?: Record<string, string> };
+    if (!payload.clientId?.trim()) throw new Error("Cliente inválido.");
+    if (!payload.fields || typeof payload.fields !== "object") {
+      throw new Error("Campos inválidos.");
+    }
+    const fields: Partial<Record<ClientFieldId, string>> = {};
+    for (const [key, value] of Object.entries(payload.fields)) {
+      if (typeof value !== "string") continue;
+      fields[key as ClientFieldId] = value;
+    }
+    return { clientId: payload.clientId.trim(), fields };
+  })
+  .handler(async ({ data }) => {
+    const user = await requireClientesAccess();
+    return updateClientData(data.clientId, user.userId, user.role === "master", data.fields);
   });
 
 export const updateClientStatusFn = createServerFn({ method: "POST" })

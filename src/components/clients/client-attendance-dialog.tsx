@@ -32,14 +32,18 @@ import {
   deleteClientAttendanceFn,
   getClientDetailFn,
   listClientAttendancesFn,
+  updateClientDataFn,
   updateClientStatusFn,
 } from "@/lib/clients/clients.server";
 import type {
   ClientActivityFlags,
   ClientAttendanceRecord,
+  ClientListItem,
   ClientRecord,
 } from "@/lib/clients/client.types";
 import { ClientAttachmentsPanel } from "@/components/clients/client-attachments-panel";
+import { ClientFieldInput } from "@/components/clients/client-field-input";
+import { productFieldsForImport } from "@/lib/clients/product-fields";
 import {
   CLIENT_FIELD_GROUPS,
   clientFieldLabel,
@@ -53,6 +57,7 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   onActivityChange?: (clientId: string, flags: Partial<ClientActivityFlags>) => void;
   onStatusChange?: (clientId: string, status: string) => void;
+  onClientFieldsChange?: (clientId: string, patch: Partial<ClientListItem>) => void;
 };
 
 /** Contatos mapeados na importação — ficam na coluna Contato (não nos dados indexados). */
@@ -79,25 +84,29 @@ function clientTitle(client: ClientRecord): string {
   return client.data.nome ?? client.data.cpf ?? client.data.telefone ?? client.id;
 }
 
-function indexedFieldGroups(client: ClientRecord, groups: ClientFieldGroup[] = CLIENT_FIELD_GROUPS) {
+/** Seções editáveis do produto (exceto contato, exibido à direita). */
+function editableProductFieldGroups(
+  productFieldIds: Set<ClientFieldId>,
+  groups: ClientFieldGroup[] = CLIENT_FIELD_GROUPS,
+) {
   return groups
     .map((group) => ({
       ...group,
-      fields: group.fields.filter((field) => {
-        if (CONTACT_FIELD_SET.has(field.id)) return false;
-        const value = client.data[field.id]?.trim();
-        return Boolean(value);
-      }),
+      fields: group.fields.filter(
+        (field) => productFieldIds.has(field.id) && !CONTACT_FIELD_SET.has(field.id),
+      ),
     }))
     .filter((group) => group.fields.length > 0);
 }
 
-function mappedContacts(client: ClientRecord, groups: ClientFieldGroup[] = CLIENT_FIELD_GROUPS) {
-  return CONTACT_FIELD_IDS.flatMap((fieldId) => {
-    const value = client.data[fieldId]?.trim();
-    if (!value) return [];
-    return [{ fieldId, label: clientFieldLabel(fieldId, groups), value }];
-  });
+function contactFieldsForProduct(
+  productFieldIds: Set<ClientFieldId>,
+  groups: ClientFieldGroup[] = CLIENT_FIELD_GROUPS,
+) {
+  return CONTACT_FIELD_IDS.filter((fieldId) => productFieldIds.has(fieldId)).map((fieldId) => ({
+    fieldId,
+    label: clientFieldLabel(fieldId, groups),
+  }));
 }
 
 export function ClientAttendanceDialog({
@@ -106,6 +115,7 @@ export function ClientAttendanceDialog({
   onOpenChange,
   onActivityChange,
   onStatusChange,
+  onClientFieldsChange,
 }: Props) {
   const { settings } = useSystemSettings();
   const getClientDetail = useServerFn(getClientDetailFn);
@@ -113,14 +123,17 @@ export function ClientAttendanceDialog({
   const createAttendance = useServerFn(createClientAttendanceFn);
   const deleteAttendance = useServerFn(deleteClientAttendanceFn);
   const updateStatus = useServerFn(updateClientStatusFn);
+  const updateClientData = useServerFn(updateClientDataFn);
 
   const [client, setClient] = useState<ClientRecord | null>(null);
+  const [draftFields, setDraftFields] = useState<Partial<Record<ClientFieldId, string>>>({});
   const [attendances, setAttendances] = useState<ClientAttendanceRecord[]>([]);
   const [note, setNote] = useState("");
   const [statusValue, setStatusValue] = useState("novo");
   const [contractStatusValue, setContractStatusValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingFields, setSavingFields] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [savingContractStatus, setSavingContractStatus] = useState(false);
 
@@ -134,6 +147,7 @@ export function ClientAttendanceDialog({
   useEffect(() => {
     if (open) return;
     setClient(null);
+    setDraftFields({});
     setAttendances([]);
     setNote("");
     setStatusValue("novo");
@@ -154,6 +168,7 @@ export function ClientAttendanceDialog({
       .then(([detail, history]) => {
         if (cancelled) return;
         setClient(detail);
+        setDraftFields({ ...detail.data });
         setStatusValue(detail.status);
         setContractStatusValue(detail.contractStatus ?? "");
         setAttendances(history);
@@ -173,13 +188,32 @@ export function ClientAttendanceDialog({
   }, [open, clientId]);
 
   const catalogGroups = settings.fieldGroups ?? CLIENT_FIELD_GROUPS;
-  const groups = useMemo(
-    () => (client ? indexedFieldGroups(client, catalogGroups) : []),
-    [client, catalogGroups],
+  const product = useMemo(
+    () => settings.products.find((item) => item.id === client?.productId) ?? null,
+    [client?.productId, settings.products],
   );
-  const contacts = useMemo(
-    () => (client ? mappedContacts(client, catalogGroups) : []),
-    [client, catalogGroups],
+  const productFieldMeta = useMemo(() => {
+    if (!product) return null;
+    return productFieldsForImport(product, catalogGroups);
+  }, [product, catalogGroups]);
+  const productFieldIds = useMemo(() => {
+    if (!productFieldMeta) return new Set<ClientFieldId>();
+    return new Set([
+      ...productFieldMeta.required.map((field) => field.id),
+      ...productFieldMeta.optional.map((field) => field.id),
+    ]);
+  }, [productFieldMeta]);
+  const requiredFieldIds = useMemo(
+    () => new Set(productFieldMeta?.required.map((field) => field.id) ?? []),
+    [productFieldMeta],
+  );
+  const groups = useMemo(
+    () => editableProductFieldGroups(productFieldIds, catalogGroups),
+    [productFieldIds, catalogGroups],
+  );
+  const contactFields = useMemo(
+    () => contactFieldsForProduct(productFieldIds, catalogGroups),
+    [productFieldIds, catalogGroups],
   );
 
   const attendanceStatusOptions = useMemo(
@@ -191,14 +225,49 @@ export function ClientAttendanceDialog({
     [settings],
   );
 
+  const setFieldValue = (fieldId: ClientFieldId, value: string) => {
+    setDraftFields((current) => ({ ...current, [fieldId]: value }));
+  };
+
   const handleCopyContact = (label: string, value: string) => {
     void copyText(value, `${label} copiado.`);
   };
 
   const handleCopyAllContacts = () => {
-    if (contacts.length === 0) return;
-    const payload = contacts.map((item) => `${item.label}: ${item.value}`).join("\n");
-    void copyText(payload, "Dados de contato copiados.");
+    const filled = contactFields
+      .map((item) => {
+        const value = draftFields[item.fieldId]?.trim();
+        if (!value) return null;
+        return `${item.label}: ${value}`;
+      })
+      .filter((item): item is string => Boolean(item));
+    if (filled.length === 0) return;
+    void copyText(filled.join("\n"), "Dados de contato copiados.");
+  };
+
+  const handleSaveFields = async () => {
+    if (!clientId || !client) return;
+    setSavingFields(true);
+    try {
+      const fields: Partial<Record<ClientFieldId, string>> = {};
+      for (const fieldId of productFieldIds) {
+        fields[fieldId] = draftFields[fieldId] ?? "";
+      }
+      const updated = await updateClientData({ data: { clientId, fields } });
+      setClient(updated);
+      setDraftFields({ ...updated.data });
+      onClientFieldsChange?.(clientId, {
+        nome: updated.data.nome ?? null,
+        cpf: updated.data.cpf ?? null,
+        telefone: updated.data.telefone ?? null,
+        valorLiberado: updated.data.valor_liberado ?? null,
+      });
+      toast.success("Dados do cliente atualizados.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível salvar os dados.");
+    } finally {
+      setSavingFields(false);
+    }
   };
 
   const applyStatusChange = async (
@@ -309,16 +378,33 @@ export function ClientAttendanceDialog({
           <div className="grid min-h-0 min-w-0 flex-1 lg:grid-cols-[1.05fr_0.95fr]">
             <section className="min-h-0 min-w-0 border-b border-border/60 lg:border-b-0 lg:border-r">
               <div className="border-b border-border/60 px-5 py-3">
-                <h3 className="text-sm font-semibold">Dados indexados na importação</h3>
-                <p className="text-xs text-muted-foreground">
-                  Campos preenchidos na planilha para este cliente.
-                </p>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-semibold">Dados do cadastro</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Campos do produto — editáveis após a criação ou importação.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={savingFields || loading || !product}
+                    onClick={() => void handleSaveFields()}
+                  >
+                    {savingFields ? <Loader2 className="size-4 animate-spin" /> : null}
+                    Salvar dados
+                  </Button>
+                </div>
               </div>
               <ScrollArea className="h-[min(58vh,620px)]">
                 <div className="space-y-5 p-5">
-                  {groups.length === 0 ? (
+                  {!product ? (
                     <p className="text-sm text-muted-foreground">
-                      Nenhum dado indexado além dos contatos.
+                      Produto do cliente não encontrado nas configurações.
+                    </p>
+                  ) : groups.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Nenhum campo de produto além dos contatos.
                     </p>
                   ) : (
                     groups.map((group) => (
@@ -326,21 +412,30 @@ export function ClientAttendanceDialog({
                         <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           {group.title}
                         </h4>
-                        <dl className="grid gap-2 sm:grid-cols-2">
-                          {group.fields.map((field) => (
-                            <div
-                              key={field.id}
-                              className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5"
-                            >
-                              <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                                {clientFieldLabel(field.id, catalogGroups)}
-                              </dt>
-                              <dd className="mt-1 text-sm font-medium break-words">
-                                {client.data[field.id]}
-                              </dd>
-                            </div>
-                          ))}
-                        </dl>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {group.fields.map((field) => {
+                            const required = requiredFieldIds.has(field.id);
+                            return (
+                              <div key={field.id} className="space-y-1.5">
+                                <Label htmlFor={`client-field-${field.id}`}>
+                                  {clientFieldLabel(field.id, catalogGroups)}
+                                  {required ? (
+                                    <span className="text-destructive"> *</span>
+                                  ) : null}
+                                </Label>
+                                <ClientFieldInput
+                                  id={`client-field-${field.id}`}
+                                  fieldId={field.id}
+                                  value={draftFields[field.id] ?? ""}
+                                  onChange={(value) => setFieldValue(field.id, value)}
+                                  banks={settings.banks}
+                                  operations={settings.operations}
+                                  required={required}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     ))
                   )}
@@ -367,7 +462,7 @@ export function ClientAttendanceDialog({
                   <div className="min-w-0 space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <h3 className="text-sm font-semibold">Contato</h3>
-                      {contacts.length > 1 ? (
+                      {contactFields.some((item) => draftFields[item.fieldId]?.trim()) ? (
                         <Button
                           type="button"
                           size="sm"
@@ -380,32 +475,47 @@ export function ClientAttendanceDialog({
                         </Button>
                       ) : null}
                     </div>
-                    <div className="grid min-w-0 grid-cols-1 gap-2">
-                      {contacts.length > 0 ? (
-                        contacts.map((item) => (
-                          <div
-                            key={item.fieldId}
-                            className="min-w-0 overflow-hidden rounded-lg border border-border/60 bg-muted/20 px-3 py-3"
-                          >
-                            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                              {item.label}
-                            </p>
-                            <p className="mt-1 break-all text-sm font-medium">{item.value}</p>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="mt-2 h-8"
-                              onClick={() => handleCopyContact(item.label, item.value)}
+                    <div className="grid min-w-0 grid-cols-1 gap-3">
+                      {contactFields.length > 0 ? (
+                        contactFields.map((item) => {
+                          const value = draftFields[item.fieldId] ?? "";
+                          const required = requiredFieldIds.has(item.fieldId);
+                          return (
+                            <div
+                              key={item.fieldId}
+                              className="min-w-0 space-y-1.5 overflow-hidden rounded-lg border border-border/60 bg-muted/20 px-3 py-3"
                             >
-                              <Copy className="size-3.5" />
-                              Copiar
-                            </Button>
-                          </div>
-                        ))
+                              <Label htmlFor={`client-contact-${item.fieldId}`}>
+                                {item.label}
+                                {required ? <span className="text-destructive"> *</span> : null}
+                              </Label>
+                              <ClientFieldInput
+                                id={`client-contact-${item.fieldId}`}
+                                fieldId={item.fieldId}
+                                value={value}
+                                onChange={(next) => setFieldValue(item.fieldId, next)}
+                                banks={settings.banks}
+                                operations={settings.operations}
+                                required={required}
+                              />
+                              {value.trim() ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="mt-1 h-8"
+                                  onClick={() => handleCopyContact(item.label, value)}
+                                >
+                                  <Copy className="size-3.5" />
+                                  Copiar
+                                </Button>
+                              ) : null}
+                            </div>
+                          );
+                        })
                       ) : (
                         <p className="text-sm text-muted-foreground">
-                          E-mail, telefone e WhatsApp não foram mapeados na importação.
+                          E-mail, telefone e WhatsApp não estão disponíveis neste produto.
                         </p>
                       )}
                     </div>

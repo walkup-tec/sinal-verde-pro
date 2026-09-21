@@ -55,6 +55,7 @@ export function ClientListActionLayer({
         onOpenChange={handleAttendanceOpenChange}
         onActivityChange={updateClientActivity}
         onStatusChange={handleStatusChange}
+        onClientFieldsChange={onClientPatch}
       />
     </>
   );

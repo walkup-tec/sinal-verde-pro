@@ -1604,3 +1604,59 @@ export async function updateClientStatus(
     ? { ...client, contractStatus: trimmed, contractStatusLabel: label }
     : { ...client, status: trimmed, statusLabel: label };
 }
+
+/**
+ * Atualiza os campos do cadastro (produto) de um cliente já existente.
+ * `fields` é o mapa completo dos campos editáveis (vazios removem a chave).
+ */
+export async function updateClientData(
+  clientId: string,
+  userId: string,
+  isMaster: boolean,
+  fields: Partial<Record<ClientFieldId, string>>,
+): Promise<ClientRecord> {
+  const client = await getClientByIdForUser(clientId, userId, isMaster);
+  if (!client) throw new Error("Cliente não encontrado.");
+
+  const settings = await loadSystemSettingsFromDisk();
+  const product = settings.products.find((item) => item.id === client.productId);
+  if (!product) throw new Error("Produto do cliente não encontrado.");
+
+  const allowed = new Set<ClientFieldId>([
+    ...product.requiredFieldIds,
+    ...product.availableFieldIds,
+  ]);
+
+  const nextData: Partial<Record<ClientFieldId, string>> = { ...client.data };
+
+  for (const [rawId, rawValue] of Object.entries(fields)) {
+    const fieldId = rawId as ClientFieldId;
+    if (!allowed.has(fieldId)) continue;
+    const trimmed = rawValue?.trim() ?? "";
+    if (trimmed) nextData[fieldId] = trimmed;
+    else delete nextData[fieldId];
+  }
+
+  for (const fieldId of product.requiredFieldIds) {
+    if (!nextData[fieldId]?.trim()) {
+      throw new Error(`Campo obrigatório: ${clientFieldLabel(fieldId, settings.fieldGroups)}`);
+    }
+  }
+
+  if (isDatabaseEnabled()) {
+    const sql = await getSql();
+    await sql`
+      update crm.clients
+      set data = ${sql.json(nextData)}, updated_at = ${new Date().toISOString()}
+      where id = ${clientId}
+    `;
+    return { ...client, data: nextData };
+  }
+
+  const clients = await readClientsFromDisk();
+  const next = clients.map((item) =>
+    item.id === clientId ? { ...item, data: nextData } : item,
+  );
+  await writeClientsToDisk(next);
+  return { ...client, data: nextData };
+}
